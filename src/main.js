@@ -88,6 +88,22 @@ const welcomeScreen = createWelcomeScreen(k, GAME_WIDTH, GAME_HEIGHT);
 // --- Patrol System ---
 const patrolSystem = setupPatrolSystem(k);
 
+// --- Animació Passiva del Portal (Pols) ---
+// Registrar onAdd globalment per capturar portals quan es creen
+k.onAdd("portal_anim", (portal) => {
+  // Inicialitzar escala i temps
+  portal.scale = k.vec2(1, 1);
+  portal.pulseTime = 0;
+
+  // Usar onUpdate per animar el pols amb una funció sinusoïdal
+  portal.onUpdate(() => {
+    portal.pulseTime += k.dt();
+    // Oscil·lació entre 1.0 i 1.2 amb una funció sinusoïdal
+    const pulseScale = 1.0 + 0.2 * (Math.sin(portal.pulseTime * 2) * 0.5 + 0.5);
+    portal.scale = k.vec2(pulseScale, pulseScale);
+  });
+});
+
 // --- Tile Definitions ---
 function getTileDefinitions() {
   return {
@@ -128,6 +144,7 @@ function getTileDefinitions() {
       k.anchor("bot"),
       k.z(1),
       "portal",
+      "portal_anim", // Etiqueta per a l'animació
     ],
   };
 }
@@ -179,9 +196,104 @@ function loadLevel(levelIndex) {
 
   // Setup collisions after level is loaded
   k.wait(0, () => {
-    // Portal collision
-    player.onCollide("portal", () => {
-      nextLevel();
+    // Variable per evitar que la col·lisió s'activi múltiples cops
+    let isTransitioning = false;
+
+    // Portal collision amb animació de transició
+    player.onCollide("portal", (portal) => {
+      // Si ja estem en transició, no facis res
+      if (isTransitioning) return;
+      isTransitioning = true;
+
+      // 1. ATUREM EL MÓN
+      k.setGravity(0); // Atura la gravetat per a tot
+      player.use(k.area(false)); // Desactiva les col·lisions del jugador
+      player.vel = k.vec2(0, 0); // Atura qualsevol moviment
+
+      // Durada de l'animació (1 segon)
+      const animTime = 1.0;
+
+      // 2. ANIMEM EL JUGADOR "CAP A DINS"
+      // Calculem el centre del portal
+      const portalCenter = k.vec2(
+        portal.pos.x,
+        portal.pos.y - (portal.sprite?.height || 32) / 2
+      );
+
+      // Anima la posició del jugador cap al centre del portal
+      k.tween(
+        player.pos, // Propietat a animar
+        portalCenter, // Destí (centre del portal)
+        animTime, // Durada
+        (p) => (player.pos = p), // Funció que actualitza la posició
+        k.easings.easeInOutSine // Una animació suau
+      );
+
+      // Anima l'escala del jugador a 0 (desapareix)
+      if (!player.scale) {
+        player.scale = k.vec2(1, 1);
+      }
+      k.tween(
+        player.scale,
+        k.vec2(0.1, 0.1), // El fem molt petit
+        animTime,
+        (s) => (player.scale = s),
+        k.easings.easeInSine
+      );
+
+      // 3. FEM EL FOS A NEGRE (Fade to Black)
+      const fadeBox = k.add([
+        k.rect(GAME_WIDTH, GAME_HEIGHT), // Un rectangle que ocupa tota la pantalla
+        k.color(0, 0, 0), // Color negre
+        k.opacity(0), // Comença transparent
+        k.z(10000), // Per sobre de tot
+        k.fixed(), // Perquè no es mogui amb la càmera
+      ]);
+
+      // Animem l'opacitat del negre d'0 a 1
+      k.tween(
+        0,
+        1,
+        animTime, // A la mateixa velocitat
+        (o) => (fadeBox.opacity = o)
+      );
+
+      // 4. CANVIEM DE NIVELL
+      // Esperem que acabi l'animació i llavors canviem
+      k.wait(animTime + 0.2, () => {
+        // Restaurem la gravetat per al proper nivell
+        k.setGravity(2400);
+
+        isTransitioning = false; // Reseteja el pany
+
+        // Canviem de nivell
+        nextLevel();
+
+        // Fade out del negre i mostrar pantalla de benvinguda
+        k.wait(0.2, () => {
+          // Fade out del negre
+          k.tween(
+            1,
+            0,
+            0.5,
+            (o) => (fadeBox.opacity = o),
+            k.easings.easeOutSine
+          ).onEnd(() => {
+            fadeBox.destroy();
+          });
+
+          // Mostrar pantalla de benvinguda del nou nivell
+          k.wait(0.3, () => {
+            const levelData = levels[currentLevelIndex];
+            if (levelData) {
+              welcomeScreen.show(
+                levelData.welcomeMessage.title,
+                levelData.welcomeMessage.text
+              );
+            }
+          });
+        });
+      });
     });
 
     // Coin collection
@@ -199,13 +311,15 @@ function loadLevel(levelIndex) {
     });
   });
 
-  // Show welcome message for this level
-  k.wait(0.1, () => {
-    welcomeScreen.show(
-      levelData.welcomeMessage.title,
-      levelData.welcomeMessage.text
-    );
-  });
+  // Show welcome message for this level (only for first level, others show after transition)
+  if (levelIndex === 0) {
+    k.wait(0.1, () => {
+      welcomeScreen.show(
+        levelData.welcomeMessage.title,
+        levelData.welcomeMessage.text
+      );
+    });
+  }
 }
 
 // --- Next Level ---

@@ -1,0 +1,39 @@
+// Level 1 - Original level
+export const level1 = {
+  id: 0,
+  name: "Nivell 1",
+  map: [
+    "                                                                                                                                  ",
+    "                                                                                                                                  ",
+    "                                                                                                                                  ",
+    "                                                                                                                                  ",
+    "                                                                                                                                  ",
+    "                                                                                                                                  ",
+    "                                                                                                                                  ",
+    "                                                                       $$$                                                        ",
+    "                                                                      #####                                                       ",
+    "                                                                                                                                  ",
+    "                                                                                                                                  ",
+    "                                    g                                                                                             ",
+    "                              ==============                                                                                      ",
+    "                                                                                                                                  ",
+    "                                                                              g                                                   ",
+    "                                                                        ===========                                               ",
+    "                                                                                                                                  ",
+    "                                                                                                  $$$$$$                        ",
+    "                                                                                                 ########                       ",
+    "                    $$                                                                                                          ",
+    "                   ####                                                                                g                          ",
+    "                                                                                                                            ^     ",
+    "    @                                     g                                                         =======                 ======",
+    "=======================     ===========================     ================    g    ========================     ===================",
+    "=======================     ===========================     ================   ===   ========================     ===================",
+  ],
+  welcomeMessage: {
+    title: "Benvingut!",
+    text: "Aquest és un text placeholder.\nPots modificar aquest text amb el teu missatge de benvinguda personalitzat.",
+  },
+  // Sprites needed for this level (will be loaded in main.js)
+  sprites: ["bean", "steel", "grass", "coin", "ghosty", "portal"],
+};
+
