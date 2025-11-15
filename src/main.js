@@ -21,11 +21,28 @@ k.loadSprite("grass", "/sprites/grass.png");
 k.loadSprite("coin", "/sprites/coin.png");
 k.loadSprite("ghosty", "/sprites/ghosty.png");
 k.loadSprite("portal", "/sprites/portal.png");
-k.loadSprite("bg1", "/sprites/1.png");
-k.loadSprite("bg2", "/sprites/2.png");
-k.loadSprite("bg3", "/sprites/3.png");
-k.loadSprite("bg4", "/sprites/4.png");
-k.loadSprite("bg5", "/sprites/5.png");
+
+// Carregar fons de Nature (Nivell 1)
+k.loadSprite("nature1", "/sprites/backgrounds/nature/1.png");
+k.loadSprite("nature2", "/sprites/backgrounds/nature/2.png");
+k.loadSprite("nature3", "/sprites/backgrounds/nature/3.png");
+k.loadSprite("nature4", "/sprites/backgrounds/nature/4.png");
+k.loadSprite("nature5", "/sprites/backgrounds/nature/5.png");
+
+// Carregar fons de Architecture (Nivell 2)
+k.loadSprite("arch1", "/sprites/backgrounds/architecture/1.png");
+k.loadSprite("arch2", "/sprites/backgrounds/architecture/2.png");
+k.loadSprite("arch3", "/sprites/backgrounds/architecture/3.png");
+k.loadSprite("arch4", "/sprites/backgrounds/architecture/4.png");
+k.loadSprite("arch5", "/sprites/backgrounds/architecture/5.png");
+k.loadSprite("arch6", "/sprites/backgrounds/architecture/6.png");
+k.loadSprite("arch7", "/sprites/backgrounds/architecture/7.png");
+
+// Carregar fons de Space (Nivell 3)
+k.loadSprite("space1", "/sprites/backgrounds/space/1.png");
+k.loadSprite("space2", "/sprites/backgrounds/space/2.png");
+k.loadSprite("space3", "/sprites/backgrounds/space/3.png");
+k.loadSprite("space4", "/sprites/backgrounds/space/4.png");
 
 // --- Variables Globals ---
 const SPEED = 480;
@@ -40,47 +57,107 @@ let coinCount = 0;
 let coinText = null;
 
 // --- Parallax Background ---
-const layers = [
-  { speed: 0.1, sprite: "bg1", z: -50 },
-  { speed: 0.2, sprite: "bg2", z: -40 },
-  { speed: 0.4, sprite: "bg3", z: -30 },
-  { speed: 0.6, sprite: "bg4", z: -20 },
-  { speed: 0.8, sprite: "bg5", z: -10 },
-];
+// Configuracions de parallax per cada nivell
+const levelBackgrounds = {
+  0: [
+    // Nature - Nivell 1
+    { speed: 0.05, sprite: "nature1", z: -50 },
+    { speed: 0.1, sprite: "nature2", z: -40 },
+    { speed: 0.2, sprite: "nature3", z: -30 },
+    { speed: 0.35, sprite: "nature4", z: -20 },
+    { speed: 0.5, sprite: "nature5", z: -10 },
+  ],
+  1: [
+    // Architecture - Nivell 2
+    { speed: 0.03, sprite: "arch1", z: -70 },
+    { speed: 0.06, sprite: "arch2", z: -60 },
+    { speed: 0.12, sprite: "arch3", z: -50 },
+    { speed: 0.2, sprite: "arch4", z: -40 },
+    { speed: 0.3, sprite: "arch5", z: -30 },
+    { speed: 0.45, sprite: "arch6", z: -20 },
+    { speed: 0.6, sprite: "arch7", z: -10 },
+  ],
+  2: [
+    // Space - Nivell 3
+    { speed: 0.08, sprite: "space1", z: -40 },
+    { speed: 0.15, sprite: "space2", z: -30 },
+    { speed: 0.3, sprite: "space3", z: -20 },
+    { speed: 0.5, sprite: "space4", z: -10 },
+  ],
+};
 
-const parallaxLayers = [];
+let parallaxLayers = [];
 
-k.onLoad(() => {
-  const bgSpriteData = k.getSprite(layers[0].sprite).data;
+// Funció per crear les capes de parallax
+function createParallaxLayers(layers) {
+  // Destruir capes anteriors
+  parallaxLayers.forEach((layer) => {
+    if (layer.container && !layer.container.destroyed) {
+      layer.container.destroy();
+    }
+  });
+  parallaxLayers = [];
+
+  if (layers.length === 0) return;
+
+  // Verificar que el sprite existeix abans d'usar-lo
+  const firstSprite = k.getSprite(layers[0].sprite);
+  if (!firstSprite || !firstSprite.data) {
+    k.debug.log(`Warning: Sprite ${layers[0].sprite} not found or not loaded!`);
+    return;
+  }
+
+  const bgSpriteData = firstSprite.data;
+  if (!bgSpriteData.width || !bgSpriteData.height) {
+    k.debug.log(`Warning: Sprite ${layers[0].sprite} data invalid!`);
+    return;
+  }
+
   const scaleX = GAME_WIDTH / bgSpriteData.width;
   const scaleY = GAME_HEIGHT / bgSpriteData.height;
   const scale = Math.max(scaleX, scaleY);
   const scaledWidth = bgSpriteData.width * scale;
 
   layers.forEach((layerDef) => {
-    const layerContainer = k.add([k.pos(0, 0), k.fixed(), k.z(layerDef.z)]);
+    // Verificar que cada sprite existeix
+    const sprite = k.getSprite(layerDef.sprite);
+    if (!sprite || !sprite.data) {
+      k.debug.log(
+        `Warning: Sprite ${layerDef.sprite} not found or not loaded!`
+      );
+      return;
+    }
 
-    layerContainer.add([
-      k.sprite(layerDef.sprite),
-      k.pos(0, 0),
-      k.anchor("topleft"),
-      k.scale(scale),
-    ]);
+    try {
+      const layerContainer = k.add([k.pos(0, 0), k.fixed(), k.z(layerDef.z)]);
 
-    layerContainer.add([
-      k.sprite(layerDef.sprite),
-      k.pos(scaledWidth, 0),
-      k.anchor("topleft"),
-      k.scale(scale),
-    ]);
+      layerContainer.add([
+        k.sprite(layerDef.sprite),
+        k.pos(0, 0),
+        k.anchor("topleft"),
+        k.scale(scale),
+      ]);
 
-    parallaxLayers.push({
-      speed: layerDef.speed,
-      container: layerContainer,
-      scaledWidth: scaledWidth,
-    });
+      layerContainer.add([
+        k.sprite(layerDef.sprite),
+        k.pos(scaledWidth, 0),
+        k.anchor("topleft"),
+        k.scale(scale),
+      ]);
+
+      parallaxLayers.push({
+        speed: layerDef.speed,
+        container: layerContainer,
+        scaledWidth: scaledWidth,
+      });
+    } catch (error) {
+      k.debug.log(
+        `Error creating parallax layer for ${layerDef.sprite}:`,
+        error
+      );
+    }
   });
-});
+}
 
 // --- Welcome Screen System ---
 const welcomeScreen = createWelcomeScreen(k, GAME_WIDTH, GAME_HEIGHT);
@@ -161,6 +238,26 @@ function loadLevel(levelIndex) {
     k.debug.log("No more levels!");
     return;
   }
+
+  // Crear capes de parallax per aquest nivell
+  // Esperar que els sprites estiguin carregats
+  const backgroundLayers = levelBackgrounds[levelIndex] || levelBackgrounds[0];
+
+  // Funció helper per intentar crear les capes amb retry
+  function tryCreateParallax(retries = 10) {
+    const firstSprite = k.getSprite(backgroundLayers[0].sprite);
+    if (firstSprite && firstSprite.data && firstSprite.data.width) {
+      createParallaxLayers(backgroundLayers);
+    } else if (retries > 0) {
+      k.wait(0.1, () => {
+        tryCreateParallax(retries - 1);
+      });
+    } else {
+      k.debug.log(`Failed to load parallax sprites for level ${levelIndex}`);
+    }
+  }
+
+  tryCreateParallax();
 
   // Load level-specific sprites if needed
   // (For now, all sprites are loaded at start, but this structure allows level-specific sprites)
