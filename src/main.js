@@ -64,6 +64,11 @@ let isDashing = false; // Si el jugador està fent dash
 let dashDirection = 0; // Direcció del dash (-1 esquerra, 1 dreta, 0 cap avall)
 let dashUpdateHandler = null; // Handler per cancel·lar l'actualització del dash
 
+// --- Sistema de Temporitzador ---
+let gameTime = 0; // Temps en segons
+let isTimerRunning = false; // Si el temporitzador està corrent
+let timerText = null; // Text del temporitzador
+
 // --- Parallax Background ---
 // Configuracions de parallax per cada nivell
 const levelBackgrounds = {
@@ -319,6 +324,9 @@ function loadLevel(levelIndex) {
       if (isTransitioning) return;
       isTransitioning = true;
 
+      // Pausar temporitzador quan es toca el portal
+      isTimerRunning = false;
+
       // 1. ATUREM EL MÓN
       k.setGravity(0); // Atura la gravetat per a tot
       player.use(k.area(false)); // Desactiva les col·lisions del jugador
@@ -402,7 +410,11 @@ function loadLevel(levelIndex) {
             if (levelData) {
               welcomeScreen.show(
                 levelData.welcomeMessage.title,
-                levelData.welcomeMessage.text
+                levelData.welcomeMessage.text,
+                () => {
+                  // Continuar temporitzador quan es tanca la pantalla
+                  isTimerRunning = true;
+                }
               );
             }
           });
@@ -428,9 +440,15 @@ function loadLevel(levelIndex) {
   // Show welcome message for this level (only for first level, others show after transition)
   if (levelIndex === 0) {
     k.wait(0.1, () => {
+      // Pausar temporitzador quan es mostra la pantalla
+      isTimerRunning = false;
       welcomeScreen.show(
         levelData.welcomeMessage.title,
-        levelData.welcomeMessage.text
+        levelData.welcomeMessage.text,
+        () => {
+          // Continuar temporitzador quan es tanca
+          isTimerRunning = true;
+        }
       );
     });
   }
@@ -443,9 +461,121 @@ function nextLevel() {
     loadLevel(currentLevelIndex);
   } else {
     // Game completed!
-    k.debug.log("Game completed!");
-    // You can add a victory screen here
+    showVictoryScreen();
   }
+}
+
+// --- Pantalla de Victòria ---
+function showVictoryScreen() {
+  // Pausar temporitzador
+  isTimerRunning = false;
+
+  // Fons semi-transparent
+  const bg = k.add([
+    k.rect(GAME_WIDTH, GAME_HEIGHT),
+    k.color(0, 0, 0, 200),
+    k.pos(0, 0),
+    k.area(),
+    k.fixed(),
+    k.z(2000),
+  ]);
+
+  // Contenidor principal
+  const container = k.add([
+    k.pos(GAME_WIDTH / 2, GAME_HEIGHT / 2),
+    k.fixed(),
+    k.z(2001),
+    k.anchor("center"),
+  ]);
+
+  // Panell de contingut
+  container.add([
+    k.rect(GAME_WIDTH * 0.9, GAME_HEIGHT * 0.8),
+    k.color(255, 255, 255),
+    k.anchor("center"),
+    k.outline(4, k.color(0, 0, 0)),
+  ]);
+
+  // Títol
+  container.add([
+    k.text("Joc Completat!", { size: 72 }),
+    k.pos(0, -GAME_HEIGHT * 0.3),
+    k.anchor("center"),
+    k.color(0, 0, 0),
+  ]);
+
+  // Temps
+  container.add([
+    k.text(`Temps: ${formatTime(gameTime)}`, { size: 48 }),
+    k.pos(0, -GAME_HEIGHT * 0.1),
+    k.anchor("center"),
+    k.color(0, 0, 0),
+  ]);
+
+  // Fulles
+  container.add([
+    k.text(`Fulles: ${coinCount}`, { size: 48 }),
+    k.pos(0, GAME_HEIGHT * 0.05),
+    k.anchor("center"),
+    k.color(0, 0, 0),
+  ]);
+
+  // Text de compartir
+  container.add([
+    k.text("Comparteix el teu resultat:", { size: 32 }),
+    k.pos(0, GAME_HEIGHT * 0.2),
+    k.anchor("center"),
+    k.color(100, 100, 100),
+  ]);
+
+  // Botons de compartir
+  const shareText = `He completat Gaia i les Fulles del Coneixement en ${formatTime(
+    gameTime
+  )} amb ${coinCount} fulles! 🍃✨`;
+  const encodedText = encodeURIComponent(shareText);
+
+  // Botó Instagram
+  const instagramBtn = container.add([
+    k.rect(180, 60),
+    k.color(225, 48, 108), // Color Instagram
+    k.pos(-100, GAME_HEIGHT * 0.3),
+    k.anchor("center"),
+    k.area(),
+    k.outline(3, k.color(0, 0, 0)),
+  ]);
+
+  instagramBtn.add([
+    k.text("Instagram", { size: 28 }),
+    k.anchor("center"),
+    k.color(255, 255, 255),
+  ]);
+
+  instagramBtn.onClick(() => {
+    // Instagram no té API directa, obrim la web amb el text
+    const url = `https://www.instagram.com/create/story/?text=${encodedText}`;
+    window.open(url, "_blank");
+  });
+
+  // Botó Twitter/X
+  const twitterBtn = container.add([
+    k.rect(180, 60),
+    k.color(29, 161, 242), // Color Twitter
+    k.pos(100, GAME_HEIGHT * 0.3),
+    k.anchor("center"),
+    k.area(),
+    k.outline(3, k.color(0, 0, 0)),
+  ]);
+
+  twitterBtn.add([
+    k.text("Twitter/X", { size: 28 }),
+    k.anchor("center"),
+    k.color(255, 255, 255),
+  ]);
+
+  twitterBtn.onClick(() => {
+    const url = `https://twitter.com/intent/tweet?text=${encodedText}`;
+    window.open(url, "_blank");
+  });
 }
 
 // --- Initialize UI ---
@@ -456,12 +586,38 @@ coinText = k.add([
   k.z(100),
 ]);
 
+// Temporitzador al top right
+timerText = k.add([
+  k.text("00:00", { size: 48 }),
+  k.pos(GAME_WIDTH - 30, 30),
+  k.fixed(),
+  k.z(100),
+  k.anchor("topright"),
+]);
+
+// Funció per formatar el temps
+function formatTime(seconds) {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins.toString().padStart(2, "0")}:${secs
+    .toString()
+    .padStart(2, "0")}`;
+}
+
 // --- Smooth Camera Following ---
 let currentCamPos = k.vec2(0, 0);
 
 // --- Game Update Loop ---
 let wasGrounded = false; // Track previous grounded state
 k.onUpdate(() => {
+  // Actualitzar temporitzador (sempre, independentment del jugador)
+  if (isTimerRunning) {
+    gameTime += k.dt();
+    if (timerText) {
+      timerText.text = formatTime(gameTime);
+    }
+  }
+
   if (!player) return;
 
   // Reset dash when player lands

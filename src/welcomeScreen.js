@@ -2,7 +2,7 @@
 export function createWelcomeScreen(k, GAME_WIDTH, GAME_HEIGHT) {
   let welcomeScreen = null;
 
-  function showWelcomeScreen(title, text) {
+  function showWelcomeScreen(title, text, onClose = null) {
     // Fons semi-transparent
     const bg = k.add([
       k.rect(GAME_WIDTH, GAME_HEIGHT),
@@ -70,11 +70,13 @@ export function createWelcomeScreen(k, GAME_WIDTH, GAME_HEIGHT) {
     // Tancar quan es clica el botó
     closeBtn.onClick(() => {
       closeWelcomeScreen();
+      if (onClose) onClose();
     });
 
     // Tancar quan es toca/clica el fons
     bg.onClick(() => {
       closeWelcomeScreen();
+      if (onClose) onClose();
     });
 
     welcomeScreen = { bg, container };
