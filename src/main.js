@@ -219,6 +219,103 @@ k.wait(0, () => {
   });
 });
 
+// --- Pantalla de Benvinguda ---
+let welcomeScreen = null;
+
+function showWelcomeScreen() {
+  // Fons semi-transparent
+  const bg = k.add([
+    k.rect(GAME_WIDTH, GAME_HEIGHT),
+    k.color(0, 0, 0, 200), // Negre semi-transparent
+    k.pos(0, 0),
+    k.area(), // Necessari per a onClick
+    k.fixed(),
+    k.z(1000),
+    "welcomeBg",
+  ]);
+
+  // Contenidor principal
+  const container = k.add([
+    k.pos(GAME_WIDTH / 2, GAME_HEIGHT / 2),
+    k.fixed(),
+    k.z(1001),
+    k.anchor("center"),
+  ]);
+
+  // Panell de contingut
+  const panel = container.add([
+    k.rect(GAME_WIDTH * 0.9, GAME_HEIGHT * 0.7),
+    k.color(255, 255, 255),
+    k.anchor("center"),
+    k.outline(4, k.color(0, 0, 0)),
+  ]);
+
+  // Títol
+  container.add([
+    k.text("Benvingut!", { size: 64, width: GAME_WIDTH * 0.8 }),
+    k.pos(0, -GAME_HEIGHT * 0.25),
+    k.anchor("center"),
+    k.color(0, 0, 0),
+  ]);
+
+  // Text placeholder (pots modificar-ho)
+  container.add([
+    k.text(
+      "Aquest és un text placeholder.\nPots modificar aquest text amb el teu missatge de benvinguda personalitzat.",
+      {
+        size: 32,
+        width: GAME_WIDTH * 0.75,
+        align: "center",
+      }
+    ),
+    k.pos(0, 0),
+    k.anchor("center"),
+    k.color(0, 0, 0),
+  ]);
+
+  // Botó de tancar
+  const closeBtn = container.add([
+    k.rect(200, 80),
+    k.color(100, 150, 255),
+    k.pos(0, GAME_HEIGHT * 0.2),
+    k.anchor("center"),
+    k.area(),
+    k.outline(3, k.color(0, 0, 0)),
+    "closeBtn",
+  ]);
+
+  const btnText = closeBtn.add([
+    k.text("Tancar", { size: 36 }),
+    k.anchor("center"),
+    k.color(255, 255, 255),
+  ]);
+
+  // Tancar quan es clica el botó
+  closeBtn.onClick(() => {
+    closeWelcomeScreen();
+  });
+
+  // Tancar quan es toca/clica el fons (opcional)
+  bg.onClick(() => {
+    closeWelcomeScreen();
+  });
+
+  welcomeScreen = { bg, container };
+}
+
+function closeWelcomeScreen() {
+  if (welcomeScreen) {
+    welcomeScreen.bg.destroy();
+    welcomeScreen.container.destroy();
+    welcomeScreen = null;
+  }
+}
+
+// Mostrar pantalla de benvinguda al iniciar
+k.wait(0.1, () => {
+  showWelcomeScreen();
+});
+
 // UI de Monedes (Sense canvis)
 let coinCount = 0;
 const coinText = k.add([
