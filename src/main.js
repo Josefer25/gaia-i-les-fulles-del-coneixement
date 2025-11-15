@@ -46,7 +46,11 @@ k.loadSprite("space4", "/sprites/backgrounds/space/4.png");
 
 // --- Variables Globals ---
 const SPEED = 480;
-k.setGravity(2400);
+const DASH_SPEED = 1200; // Velocitat del dash (més exagerat)
+const DASH_DURATION = 0.2; // Duració del dash en segons (més llarg)
+const AIR_FRICTION = 0.92; // Fricció a l'aire (0.92 = redueix 8% cada frame)
+const GRAVITY = 2400;
+k.setGravity(GRAVITY);
 
 // --- Sistema de Nivells ---
 let currentLevelIndex = 0;
@@ -55,6 +59,10 @@ let player = null;
 let startPos = null;
 let coinCount = 0;
 let coinText = null;
+let canDash = false; // Si el jugador pot fer dash
+let isDashing = false; // Si el jugador està fent dash
+let dashDirection = 0; // Direcció del dash (-1 esquerra, 1 dreta, 0 cap avall)
+let dashUpdateHandler = null; // Handler per cancel·lar l'actualització del dash
 
 // --- Parallax Background ---
 // Configuracions de parallax per cada nivell
@@ -281,6 +289,15 @@ function loadLevel(levelIndex) {
   player = level.get("player")[0];
   startPos = player.pos.clone();
 
+  // Reset dash ability when level loads
+  canDash = false;
+  isDashing = false;
+  dashDirection = 0;
+  if (dashUpdateHandler) {
+    dashUpdateHandler.cancel();
+    dashUpdateHandler = null;
+  }
+
   // Reset camera position to player position
   currentCamPos = player.worldPos();
   k.setCamPos(currentCamPos);
@@ -443,8 +460,42 @@ coinText = k.add([
 let currentCamPos = k.vec2(0, 0);
 
 // --- Game Update Loop ---
+let wasGrounded = false; // Track previous grounded state
 k.onUpdate(() => {
   if (!player) return;
+
+  // Reset dash when player lands
+  if (player.isGrounded() && !wasGrounded) {
+    // Player just landed
+    canDash = false;
+    isDashing = false;
+    // Aturar velocitat horitzontal quan toca terra
+    player.vel.x = 0;
+    // Cancel·lar handler de dash si existeix
+    if (dashUpdateHandler) {
+      dashUpdateHandler.cancel();
+      dashUpdateHandler = null;
+    }
+    // Restaurar escala i rotació si estaven modificades
+    if (player.scale) {
+      player.scale = k.vec2(1, 1);
+    }
+    player.angle = 0;
+    if (player.opacity !== undefined) {
+      player.opacity = 1;
+    }
+  }
+  wasGrounded = player.isGrounded();
+
+  // Aplicar fricció a l'aire quan no està dashing i no està a terra
+  if (!player.isGrounded() && !isDashing) {
+    // Aplicar fricció a la velocitat horitzontal
+    player.vel.x *= AIR_FRICTION;
+    // Si la velocitat és molt petita, aturar-la completament
+    if (Math.abs(player.vel.x) < 10) {
+      player.vel.x = 0;
+    }
+  }
 
   const targetCamPos = player.worldPos();
 
@@ -475,6 +526,10 @@ k.onUpdate(() => {
     player.vel.y = 0;
     // Reset camera position too
     currentCamPos = player.worldPos();
+    // Reset dash
+    canDash = false;
+    isDashing = false;
+    dashDirection = 0;
   }
 });
 
@@ -485,18 +540,99 @@ k.onUpdate(() => {
 k.onKeyPress("space", () => {
   if (player && player.isGrounded()) {
     player.jump(1500);
+    // Permetre dash quan salta
+    canDash = true;
   }
 });
 
 k.onKeyDown("left", () => {
-  if (player) {
+  if (player && !isDashing) {
     player.move(-SPEED, 0);
+    dashDirection = -1; // Guardar direcció per al dash
   }
 });
 
 k.onKeyDown("right", () => {
-  if (player) {
+  if (player && !isDashing) {
     player.move(SPEED, 0);
+    dashDirection = 1; // Guardar direcció per al dash
+  }
+});
+
+// --- Dash Feature ---
+k.onKeyPress("d", () => {
+  if (player && !player.isGrounded() && canDash && !isDashing) {
+    // Determinar direcció del dash (prioritzar direcció de moviment, sinó cap a la dreta)
+    const dashDir = dashDirection !== 0 ? dashDirection : 1;
+
+    // Guardar l'escala original
+    const originalScale = player.scale ? player.scale.clone() : k.vec2(1, 1);
+
+    // Aplicar velocitat de dash (més exagerat)
+    player.vel.x = dashDir * DASH_SPEED;
+
+    // Marcar que està fent dash
+    isDashing = true;
+    canDash = false; // No pot fer dash de nou
+
+    // Animació visual del dash
+    // 1. Escalar el jugador (estirar-se en la direcció del dash) - més exagerat
+    const stretchX = dashDir > 0 ? 1.5 : 0.6; // Estirar més cap a la direcció del dash
+    const stretchY = 0.7; // Aixafar més
+    player.scale = k.vec2(stretchX, stretchY);
+
+    // 2. Rotar més per donar sensació de velocitat
+    const rotationAmount = dashDir * 0.4; // Rotar més en la direcció del dash
+    player.angle = rotationAmount;
+
+    // 3. Canviar opacitat lleugerament per efecte de velocitat
+    const originalOpacity = player.opacity !== undefined ? player.opacity : 1;
+    player.opacity = 0.9;
+
+    // Aplicar compensació de gravetat durant tot el dash
+    let dashTime = 0;
+
+    // Cancel·lar qualsevol handler anterior
+    if (dashUpdateHandler) {
+      dashUpdateHandler.cancel();
+    }
+
+    dashUpdateHandler = player.onUpdate(() => {
+      if (isDashing) {
+        dashTime += k.dt();
+
+        // Compensar la gravetat constantment (aplicar força cap amunt igual a la gravetat)
+        // La gravetat aplica GRAVITY * dt cap avall, així que compensem amb la mateixa força cap amunt
+        player.vel.y += GRAVITY * k.dt();
+
+        // Animació de retorn suau de l'escala i rotació
+        const progress = dashTime / DASH_DURATION;
+        const easeOut = 1 - Math.pow(1 - progress, 3); // Easing cúbic
+
+        // Retornar gradualment a l'escala original
+        const currentScaleX = k.lerp(stretchX, originalScale.x, easeOut);
+        const currentScaleY = k.lerp(stretchY, originalScale.y, easeOut);
+        player.scale = k.vec2(currentScaleX, currentScaleY);
+
+        // Retornar gradualment la rotació
+        player.angle = k.lerp(rotationAmount, 0, easeOut);
+
+        // Retornar opacitat
+        player.opacity = k.lerp(0.9, originalOpacity, easeOut);
+
+        // Si ha acabat el dash, netejar l'animació
+        if (dashTime >= DASH_DURATION) {
+          isDashing = false;
+          // Restaurar valors originals
+          player.scale = originalScale;
+          player.angle = 0;
+          player.opacity = originalOpacity;
+          // Aturar l'actualització del dash
+          dashUpdateHandler.cancel();
+          dashUpdateHandler = null;
+        }
+      }
+    });
   }
 });
 
