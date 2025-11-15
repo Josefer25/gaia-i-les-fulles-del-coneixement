@@ -1,6 +1,9 @@
 import kaplay from "kaplay";
+import { levels } from "./levels.js";
+import { createWelcomeScreen } from "./welcomeScreen.js";
+import { setupPatrolSystem } from "./patrol.js";
 
-// --- Configuració del Joc (Mantenim el 9:16 vertical) ---
+// --- Configuració del Joc ---
 const GAME_WIDTH = 720;
 const GAME_HEIGHT = 1280;
 
@@ -11,24 +14,32 @@ const k = kaplay({
   scale: 1,
 });
 
-// --- Càrrega de Sprites (Sense canvis) ---
+// --- Càrrega de Sprites ---
 k.loadSprite("bean", "/sprites/bean.png");
 k.loadSprite("steel", "/sprites/steel.png");
 k.loadSprite("grass", "/sprites/grass.png");
 k.loadSprite("coin", "/sprites/coin.png");
 k.loadSprite("ghosty", "/sprites/ghosty.png");
-k.loadSprite("portal", "sprites/portal.png");
+k.loadSprite("portal", "/sprites/portal.png");
 k.loadSprite("bg1", "/sprites/1.png");
 k.loadSprite("bg2", "/sprites/2.png");
 k.loadSprite("bg3", "/sprites/3.png");
 k.loadSprite("bg4", "/sprites/4.png");
 k.loadSprite("bg5", "/sprites/5.png");
 
-// --- Variables (Sense canvis) ---
+// --- Variables Globals ---
 const SPEED = 480;
 k.setGravity(2400);
 
-// --- Lògica de Fons Parallax (GRAN CANVI ACÍ) ---
+// --- Sistema de Nivells ---
+let currentLevelIndex = 0;
+let level = null;
+let player = null;
+let startPos = null;
+let coinCount = 0;
+let coinText = null;
+
+// --- Parallax Background ---
 const layers = [
   { speed: 0.1, sprite: "bg1", z: -50 },
   { speed: 0.2, sprite: "bg2", z: -40 },
@@ -40,339 +51,243 @@ const layers = [
 const parallaxLayers = [];
 
 k.onLoad(() => {
-  // Obtenim la informació de la imatge de fons
-  // (Assumim que totes les capes de fons tenen la mateixa mida)
   const bgSpriteData = k.getSprite(layers[0].sprite).data;
-
-  // --- NOU CANVI: Càlcul de l'escala "Cover" ---
-  // Calculem quant hem d'escalar en ample i alt per a omplir
   const scaleX = GAME_WIDTH / bgSpriteData.width;
   const scaleY = GAME_HEIGHT / bgSpriteData.height;
-
-  // Triem l'escala MÉS GRAN per a assegurar que cobrim tot
   const scale = Math.max(scaleX, scaleY);
-
-  // Calculem l'ample real de la imatge un colp escalada
   const scaledWidth = bgSpriteData.width * scale;
-  // --- FI DEL NOU CANVI ---
 
   layers.forEach((layerDef) => {
     const layerContainer = k.add([k.pos(0, 0), k.fixed(), k.z(layerDef.z)]);
 
-    // Afegim la Part 1
     layerContainer.add([
       k.sprite(layerDef.sprite),
       k.pos(0, 0),
       k.anchor("topleft"),
-      k.scale(scale), // <-- NOU CANVI: Usem k.scale() en lloc de width/height
+      k.scale(scale),
     ]);
 
-    // Afegim la Part 2
     layerContainer.add([
       k.sprite(layerDef.sprite),
-      k.pos(scaledWidth, 0), // <-- NOU CANVI: Usem el nou ample escalat
+      k.pos(scaledWidth, 0),
       k.anchor("topleft"),
-      k.scale(scale), // <-- NOU CANVI: Usem k.scale()
+      k.scale(scale),
     ]);
 
     parallaxLayers.push({
       speed: layerDef.speed,
       container: layerContainer,
-      scaledWidth: scaledWidth, // <-- NOU CANVI: Guardem el nou ample
+      scaledWidth: scaledWidth,
     });
   });
 });
-// --- Nivell (Disseny estil "Mario") ---
-const level = k.addLevel(
-  [
-    // El mapa ara té un pis principal (a baix de tot) amb sots,
-    // i plataformes puntuals a sobre per a les monedes i enemics.
-    "                                                                                                                                  ", // 1
-    "                                                                                                                                  ", // 2
-    "                                                                                                                                  ", // 3
-    "                                                                                                                                  ", // 4
-    "                                                                                                                                  ", // 5
-    "                                                                                                                                  ", // 6
-    "                                                                                                                                  ", // 7
-    "                                                                       $$$                                                        ", // 8 (Monedes altes)
-    "                                                                      #####                                                       ", // 9 (Blocs alts)
-    "                                                                                                                                  ", // 10
-    "                                                                                                                                  ", // 11
-    "                                    g                                                                                             ", // 12
-    "                              ==============                                                                                      ", // 13 (Plataforma alta)
-    "                                                                                                                                  ", // 14
-    "                                                                              g                                                   ", // 15
-    "                                                                        ===========                                               ", // 16
-    "                                                                                                                                  ", // 17
-    "                                                                                                  $$$$$$                        ", // 18 (Grup de monedes)
-    "                                                                                                 ########                       ", // 19 (Grup de blocs)
-    "                    $$                                                                                                          ", // 20
-    "                   ####                                                                                g                          ", // 21 (Blocs baixos)
-    "                                                                                                                            ^     ", // 22 (Meta!)
-    "    @                                     g                                                         =======                 ======", // 23 (Inici i plataforma final)
-    "=======================     ===========================     ================    g    ========================     ===================", // 24 (SÒL PRINCIPAL amb SOTS)
-    "=======================     ===========================     ================   ===   ========================     ===================", // 25 (Base sòlida)
-  ],
-  {
-    // ... (la teua definició de 'tiles') ...
-    tileWidth: 64,
-    tileHeight: 64,
-    tiles: {
-      "@": () => [
-        k.sprite("bean"),
-        k.area(),
-        k.body(),
-        k.anchor("bot"),
-        k.z(2),
-        "player",
-      ],
-      "=": () => [
-        k.sprite("grass"),
-        k.area(),
-        k.body({ isStatic: true }),
-        k.anchor("bot"),
-        "wall",
-      ],
-      "#": () => [
-        k.sprite("steel"),
-        k.area(),
-        k.body({ isStatic: true }),
-        k.anchor("bot"),
-        "wall",
-      ],
-      $: () => [k.sprite("coin"), k.area(), k.anchor("center"), k.z(1), "coin"],
-      g: () => [
-        k.sprite("ghosty"),
-        k.pos(),
-        k.area(),
-        k.anchor("bot"),
-        k.z(1),
-        "enemy",
-      ],
-      // --- NOU TILE PER A LA META ---
-      // (Pots canviar "portal" pel nom del teu sprite de meta)
-      "^": () => [
-        k.sprite("portal"), // Assegura't de tenir un sprite anomenat "portal"
-        k.area(),
-        k.anchor("bot"),
-        k.z(1),
-        "portal", // Una etiqueta per a la col·lisió
-      ],
-    },
-  }
-);
 
-// --- Lògica del Joc ---
-const player = level.get("player")[0];
-const startPos = player.pos.clone();
+// --- Welcome Screen System ---
+const welcomeScreen = createWelcomeScreen(k, GAME_WIDTH, GAME_HEIGHT);
 
-// --- Custom Patrol System amb Tweening (com a main.js) ---
-function customPatrol(waypoints, speed) {
+// --- Patrol System ---
+const patrolSystem = setupPatrolSystem(k);
+
+// --- Tile Definitions ---
+function getTileDefinitions() {
   return {
-    id: "customPatrol",
-    waypoints: waypoints,
-    speed: speed,
-    currentTargetIndex: 1,
+    "@": () => [
+      k.sprite("bean"),
+      k.area(),
+      k.body(),
+      k.anchor("bot"),
+      k.z(2),
+      "player",
+    ],
+    "=": () => [
+      k.sprite("grass"),
+      k.area(),
+      k.body({ isStatic: true }),
+      k.anchor("bot"),
+      "wall",
+    ],
+    "#": () => [
+      k.sprite("steel"),
+      k.area(),
+      k.body({ isStatic: true }),
+      k.anchor("bot"),
+      "wall",
+    ],
+    $: () => [k.sprite("coin"), k.area(), k.anchor("center"), k.z(1), "coin"],
+    g: () => [
+      k.sprite("ghosty"),
+      k.pos(),
+      k.area(),
+      k.anchor("bot"),
+      k.z(1),
+      "enemy",
+    ],
+    "^": () => [
+      k.sprite("portal"),
+      k.area(),
+      k.anchor("bot"),
+      k.z(1),
+      "portal",
+    ],
   };
 }
 
-function startPatrolLeg(enemy) {
-  const { waypoints, speed, currentTargetIndex } = enemy;
+// --- Load Level ---
+function loadLevel(levelIndex) {
+  // Destroy previous level if exists
+  if (level) {
+    level.destroy();
+  }
 
-  const targetPos = waypoints[currentTargetIndex];
+  const levelData = levels[levelIndex];
+  if (!levelData) {
+    k.debug.log("No more levels!");
+    return;
+  }
 
-  const distance = enemy.pos.dist(targetPos);
-  const duration = distance / enemy.speed;
+  // Load level-specific sprites if needed
+  // (For now, all sprites are loaded at start, but this structure allows level-specific sprites)
+  if (levelData.sprites) {
+    // Future: Load level-specific sprites here
+    // levelData.sprites.forEach(sprite => {
+    //   if (!k.getSprite(sprite)) {
+    //     k.loadSprite(sprite, `/sprites/${sprite}.png`);
+    //   }
+    // });
+  }
 
-  k.tween(
-    enemy.pos,
-    targetPos,
-    duration,
-    (newPos) => (enemy.pos = newPos),
-    k.easings.linear
-  ).onEnd(() => {
-    // Ping-pong: flip index between 0 and 1
-    enemy.currentTargetIndex = currentTargetIndex === 0 ? 1 : 0;
-    startPatrolLeg(enemy);
+  // Create new level
+  level = k.addLevel(levelData.map, {
+    tileWidth: 64,
+    tileHeight: 64,
+    tiles: getTileDefinitions(),
+  });
+
+  // Get player and set start position
+  player = level.get("player")[0];
+  startPos = player.pos.clone();
+
+  // Reset camera position to player position
+  currentCamPos = player.worldPos();
+  k.setCamPos(currentCamPos);
+
+  // Setup enemy patrol
+  k.wait(0, () => {
+    const enemies = level.get("enemy");
+    patrolSystem.setupEnemyPatrol(enemies);
+  });
+
+  // Setup collisions after level is loaded
+  k.wait(0, () => {
+    // Portal collision
+    player.onCollide("portal", () => {
+      nextLevel();
+    });
+
+    // Coin collection
+    player.onCollide("coin", (coin) => {
+      coinCount++;
+      coinText.text = `Fulles: ${coinCount}`;
+      coin.destroy();
+    });
+
+    // Enemy collision - death
+    player.onCollide("enemy", () => {
+      player.pos = startPos.clone();
+      player.vel.x = 0;
+      player.vel.y = 0;
+    });
+  });
+
+  // Show welcome message for this level
+  k.wait(0.1, () => {
+    welcomeScreen.show(
+      levelData.welcomeMessage.title,
+      levelData.welcomeMessage.text
+    );
   });
 }
 
-// Setup patrol per a cada enemic
-k.wait(0, () => {
-  const enemies = level.get("enemy");
-  enemies.forEach((enemy) => {
-    const startX = enemy.pos.x;
-    const startY = enemy.pos.y;
-    const patrolDist = 200;
-
-    // Waypoints: esquerra i dreta
-    const waypoints = [
-      k.vec2(startX - patrolDist, startY),
-      k.vec2(startX + patrolDist, startY),
-    ];
-
-    // Afegir customPatrol component
-    Object.assign(enemy, customPatrol(waypoints, 100));
-
-    // Iniciar patrulla
-    startPatrolLeg(enemy);
-  });
-});
-
-// --- Pantalla de Benvinguda ---
-let welcomeScreen = null;
-
-function showWelcomeScreen() {
-  // Fons semi-transparent
-  const bg = k.add([
-    k.rect(GAME_WIDTH, GAME_HEIGHT),
-    k.color(0, 0, 0, 200), // Negre semi-transparent
-    k.pos(0, 0),
-    k.area(), // Necessari per a onClick
-    k.fixed(),
-    k.z(1000),
-    "welcomeBg",
-  ]);
-
-  // Contenidor principal
-  const container = k.add([
-    k.pos(GAME_WIDTH / 2, GAME_HEIGHT / 2),
-    k.fixed(),
-    k.z(1001),
-    k.anchor("center"),
-  ]);
-
-  // Panell de contingut
-  const panel = container.add([
-    k.rect(GAME_WIDTH * 0.9, GAME_HEIGHT * 0.7),
-    k.color(255, 255, 255),
-    k.anchor("center"),
-    k.outline(4, k.color(0, 0, 0)),
-  ]);
-
-  // Títol
-  container.add([
-    k.text("Benvingut!", { size: 64, width: GAME_WIDTH * 0.8 }),
-    k.pos(0, -GAME_HEIGHT * 0.25),
-    k.anchor("center"),
-    k.color(0, 0, 0),
-  ]);
-
-  // Text placeholder (pots modificar-ho)
-  container.add([
-    k.text(
-      "Aquest és un text placeholder.\nPots modificar aquest text amb el teu missatge de benvinguda personalitzat.",
-      {
-        size: 32,
-        width: GAME_WIDTH * 0.75,
-        align: "center",
-      }
-    ),
-    k.pos(0, 0),
-    k.anchor("center"),
-    k.color(0, 0, 0),
-  ]);
-
-  // Botó de tancar
-  const closeBtn = container.add([
-    k.rect(200, 80),
-    k.color(100, 150, 255),
-    k.pos(0, GAME_HEIGHT * 0.2),
-    k.anchor("center"),
-    k.area(),
-    k.outline(3, k.color(0, 0, 0)),
-    "closeBtn",
-  ]);
-
-  const btnText = closeBtn.add([
-    k.text("Tancar", { size: 36 }),
-    k.anchor("center"),
-    k.color(255, 255, 255),
-  ]);
-
-  // Tancar quan es clica el botó
-  closeBtn.onClick(() => {
-    closeWelcomeScreen();
-  });
-
-  // Tancar quan es toca/clica el fons (opcional)
-  bg.onClick(() => {
-    closeWelcomeScreen();
-  });
-
-  welcomeScreen = { bg, container };
-}
-
-function closeWelcomeScreen() {
-  if (welcomeScreen) {
-    welcomeScreen.bg.destroy();
-    welcomeScreen.container.destroy();
-    welcomeScreen = null;
+// --- Next Level ---
+function nextLevel() {
+  currentLevelIndex++;
+  if (currentLevelIndex < levels.length) {
+    loadLevel(currentLevelIndex);
+  } else {
+    // Game completed!
+    k.debug.log("Game completed!");
+    // You can add a victory screen here
   }
 }
 
-// Mostrar pantalla de benvinguda al iniciar
-k.wait(0.1, () => {
-  showWelcomeScreen();
-});
-
-// UI de Monedes (Sense canvis)
-let coinCount = 0;
-const coinText = k.add([
+// --- Initialize UI ---
+coinText = k.add([
   k.text("Fulles: 0", { size: 48 }),
   k.pos(30, 30),
   k.fixed(),
   k.z(100),
 ]);
 
-// --- Bucle Principal d'Actualització (PETIT CANVI ACÍ) ---
+// --- Smooth Camera Following ---
+let currentCamPos = k.vec2(0, 0);
+
+// --- Game Update Loop ---
 k.onUpdate(() => {
-  const camPos = player.worldPos();
-  k.setCamPos(camPos);
+  if (!player) return;
 
-  // --- NOU: Lògica de Parallax amb 'scaledWidth' ---
+  const targetCamPos = player.worldPos();
+
+  // Smooth camera following using lerp (linear interpolation)
+  // Higher value (0.2) = faster follow, lower (0.05) = smoother but slower
+  const lerpSpeed = 0.2;
+
+  // Manual lerp: current + (target - current) * speed
+  const dx = (targetCamPos.x - currentCamPos.x) * lerpSpeed;
+  const dy = (targetCamPos.y - currentCamPos.y) * lerpSpeed;
+  currentCamPos.x += dx;
+  currentCamPos.y += dy;
+
+  k.setCamPos(currentCamPos);
+
+  // Parallax scrolling - use smooth camera position
   for (const layer of parallaxLayers) {
-    const totalMovement = camPos.x * layer.speed;
-    // Usem el 'scaledWidth' que hem calculat abans
-    const offsetX = totalMovement % layer.scaledWidth; // <-- NOU CANVI
-
+    const totalMovement = currentCamPos.x * layer.speed;
+    const offsetX = totalMovement % layer.scaledWidth;
     layer.container.pos.x = -offsetX;
   }
-  // --- FI DE LA LÒGICA DE PARALLAX ---
 
-  // Reset si caus (Sense canvis)
+  // Reset if player falls
   const failThreshold = 2500;
   if (player.pos.y > failThreshold) {
     player.pos = startPos.clone();
     player.vel.x = 0;
     player.vel.y = 0;
+    // Reset camera position too
+    currentCamPos = player.worldPos();
   }
 });
 
-// Col·lisions (Sense canvis)
-player.onCollide("coin", (coin) => {
-  coinCount++;
-  coinText.text = `Fulles: ${coinCount}`;
-  coin.destroy();
-});
+// --- Collisions (set up in loadLevel) ---
+// These are set up per level in the loadLevel function
 
-player.onCollide("enemy", () => {
-  player.pos = startPos.clone();
-  player.vel.x = 0;
-  player.vel.y = 0;
-});
-
-// Moviments (Sense canvis)
+// --- Player Controls ---
 k.onKeyPress("space", () => {
-  if (player.isGrounded()) {
+  if (player && player.isGrounded()) {
     player.jump(1500);
   }
 });
 
 k.onKeyDown("left", () => {
-  player.move(-SPEED, 0);
+  if (player) {
+    player.move(-SPEED, 0);
+  }
 });
 
 k.onKeyDown("right", () => {
-  player.move(SPEED, 0);
+  if (player) {
+    player.move(SPEED, 0);
+  }
 });
+
+// --- Start Game ---
+loadLevel(0);
