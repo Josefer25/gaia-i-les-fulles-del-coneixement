@@ -50,6 +50,9 @@ const DASH_SPEED = 1200; // Velocitat del dash (més exagerat)
 const DASH_DURATION = 0.2; // Duració del dash en segons (més llarg)
 const AIR_FRICTION = 0.92; // Fricció a l'aire (0.92 = redueix 8% cada frame)
 const GRAVITY = 2400;
+const TOUCH_MOVE_DELAY_MS = 50;
+const TOUCH_SWIPE_THRESHOLD = 90;
+const TOUCH_GESTURE_RESET_MS = 180;
 k.setGravity(GRAVITY);
 
 // --- Sistema de Nivells ---
@@ -63,6 +66,28 @@ let canDash = false; // Si el jugador pot fer dash
 let isDashing = false; // Si el jugador està fent dash
 let dashDirection = 0; // Direcció del dash (-1 esquerra, 1 dreta, 0 cap avall)
 let dashUpdateHandler = null; // Handler per cancel·lar l'actualització del dash
+
+const touchState = {
+  id: null,
+  startClientX: 0,
+  startClientY: 0,
+  lastClientX: 0,
+  lastClientY: 0,
+  moveTimeoutId: null,
+  gestureUsed: false,
+  gestureResetTimeoutId: null,
+};
+let isTouchMoving = false;
+let touchMoveDirection = 0;
+
+const extraSwipeState = {
+  id: null,
+  startClientX: 0,
+  startClientY: 0,
+  lastClientX: 0,
+  lastClientY: 0,
+  gestureUsed: false,
+};
 
 // --- Sistema de Temporitzador ---
 let gameTime = 0; // Temps en segons
@@ -620,6 +645,11 @@ k.onUpdate(() => {
 
   if (!player) return;
 
+  if (!isDashing && isTouchMoving && touchMoveDirection !== 0) {
+    player.move(touchMoveDirection * SPEED, 0);
+    dashDirection = touchMoveDirection;
+  }
+
   // Reset dash when player lands
   if (player.isGrounded() && !wasGrounded) {
     // Player just landed
@@ -693,12 +723,88 @@ k.onUpdate(() => {
 // These are set up per level in the loadLevel function
 
 // --- Player Controls ---
-k.onKeyPress("space", () => {
+function attemptJump() {
   if (player && player.isGrounded()) {
     player.jump(1500);
-    // Permetre dash quan salta
     canDash = true;
+    return true;
   }
+  return false;
+}
+
+function attemptDash(directionOverride) {
+  if (!player) {
+    return false;
+  }
+
+  if (typeof directionOverride === "number" && directionOverride !== 0) {
+    dashDirection = directionOverride;
+  }
+
+  if (player.isGrounded() || !canDash || isDashing) {
+    return false;
+  }
+
+  const dashDir =
+    typeof directionOverride === "number" && directionOverride !== 0
+      ? directionOverride
+      : dashDirection !== 0
+      ? dashDirection
+      : 1;
+
+  const originalScale = player.scale ? player.scale.clone() : k.vec2(1, 1);
+  const originalOpacity = player.opacity !== undefined ? player.opacity : 1;
+  const stretchX = dashDir > 0 ? 1.5 : 0.6;
+  const stretchY = 0.7;
+  const rotationAmount = dashDir * 0.4;
+
+  player.vel.x = dashDir * DASH_SPEED;
+  isDashing = true;
+  canDash = false;
+
+  player.scale = k.vec2(stretchX, stretchY);
+  player.angle = rotationAmount;
+  player.opacity = 0.9;
+
+  let dashTime = 0;
+
+  if (dashUpdateHandler) {
+    dashUpdateHandler.cancel();
+  }
+
+  dashUpdateHandler = player.onUpdate(() => {
+    if (!isDashing) {
+      return;
+    }
+
+    dashTime += k.dt();
+    player.vel.y += GRAVITY * k.dt();
+
+    const progress = dashTime / DASH_DURATION;
+    const easeOut = 1 - Math.pow(1 - progress, 3);
+    const currentScaleX = k.lerp(stretchX, originalScale.x, easeOut);
+    const currentScaleY = k.lerp(stretchY, originalScale.y, easeOut);
+    player.scale = k.vec2(currentScaleX, currentScaleY);
+    player.angle = k.lerp(rotationAmount, 0, easeOut);
+    player.opacity = k.lerp(0.9, originalOpacity, easeOut);
+
+    if (dashTime >= DASH_DURATION) {
+      isDashing = false;
+      player.scale = originalScale;
+      player.angle = 0;
+      player.opacity = originalOpacity;
+      if (dashUpdateHandler) {
+        dashUpdateHandler.cancel();
+        dashUpdateHandler = null;
+      }
+    }
+  });
+
+  return true;
+}
+
+k.onKeyPress("space", () => {
+  attemptJump();
 });
 
 k.onKeyDown("left", () => {
@@ -717,80 +823,306 @@ k.onKeyDown("right", () => {
 
 // --- Dash Feature ---
 k.onKeyPress("d", () => {
-  if (player && !player.isGrounded() && canDash && !isDashing) {
-    // Determinar direcció del dash (prioritzar direcció de moviment, sinó cap a la dreta)
-    const dashDir = dashDirection !== 0 ? dashDirection : 1;
-
-    // Guardar l'escala original
-    const originalScale = player.scale ? player.scale.clone() : k.vec2(1, 1);
-
-    // Aplicar velocitat de dash (més exagerat)
-    player.vel.x = dashDir * DASH_SPEED;
-
-    // Marcar que està fent dash
-    isDashing = true;
-    canDash = false; // No pot fer dash de nou
-
-    // Animació visual del dash
-    // 1. Escalar el jugador (estirar-se en la direcció del dash) - més exagerat
-    const stretchX = dashDir > 0 ? 1.5 : 0.6; // Estirar més cap a la direcció del dash
-    const stretchY = 0.7; // Aixafar més
-    player.scale = k.vec2(stretchX, stretchY);
-
-    // 2. Rotar més per donar sensació de velocitat
-    const rotationAmount = dashDir * 0.4; // Rotar més en la direcció del dash
-    player.angle = rotationAmount;
-
-    // 3. Canviar opacitat lleugerament per efecte de velocitat
-    const originalOpacity = player.opacity !== undefined ? player.opacity : 1;
-    player.opacity = 0.9;
-
-    // Aplicar compensació de gravetat durant tot el dash
-    let dashTime = 0;
-
-    // Cancel·lar qualsevol handler anterior
-    if (dashUpdateHandler) {
-      dashUpdateHandler.cancel();
-    }
-
-    dashUpdateHandler = player.onUpdate(() => {
-      if (isDashing) {
-        dashTime += k.dt();
-
-        // Compensar la gravetat constantment (aplicar força cap amunt igual a la gravetat)
-        // La gravetat aplica GRAVITY * dt cap avall, així que compensem amb la mateixa força cap amunt
-        player.vel.y += GRAVITY * k.dt();
-
-        // Animació de retorn suau de l'escala i rotació
-        const progress = dashTime / DASH_DURATION;
-        const easeOut = 1 - Math.pow(1 - progress, 3); // Easing cúbic
-
-        // Retornar gradualment a l'escala original
-        const currentScaleX = k.lerp(stretchX, originalScale.x, easeOut);
-        const currentScaleY = k.lerp(stretchY, originalScale.y, easeOut);
-        player.scale = k.vec2(currentScaleX, currentScaleY);
-
-        // Retornar gradualment la rotació
-        player.angle = k.lerp(rotationAmount, 0, easeOut);
-
-        // Retornar opacitat
-        player.opacity = k.lerp(0.9, originalOpacity, easeOut);
-
-        // Si ha acabat el dash, netejar l'animació
-        if (dashTime >= DASH_DURATION) {
-          isDashing = false;
-          // Restaurar valors originals
-          player.scale = originalScale;
-          player.angle = 0;
-          player.opacity = originalOpacity;
-          // Aturar l'actualització del dash
-          dashUpdateHandler.cancel();
-          dashUpdateHandler = null;
-        }
-      }
-    });
-  }
+  attemptDash();
 });
 
+function setupTouchControls() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const nav = window.navigator;
+  const hasTouchPoints =
+    (nav && typeof nav.maxTouchPoints === "number" && nav.maxTouchPoints > 0) ||
+    (nav &&
+      "msMaxTouchPoints" in nav &&
+      nav.msMaxTouchPoints &&
+      nav.msMaxTouchPoints > 0);
+  const prefersCoarsePointer =
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(pointer: coarse)").matches;
+  const prefersNoHover =
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(hover: none)").matches;
+
+  if (!hasTouchPoints && !prefersCoarsePointer && !prefersNoHover) {
+    return;
+  }
+
+  const canvas = k.canvas;
+  if (!canvas) {
+    return;
+  }
+
+  if (canvas.style && canvas.style.touchAction !== "none") {
+    canvas.style.touchAction = "none";
+  }
+
+  const clearMovementTimeout = () => {
+    if (touchState.moveTimeoutId !== null) {
+      window.clearTimeout(touchState.moveTimeoutId);
+      touchState.moveTimeoutId = null;
+    }
+  };
+
+  const stopTouchMovement = () => {
+    isTouchMoving = false;
+    touchMoveDirection = 0;
+  };
+
+  const resetTouchState = () => {
+    clearMovementTimeout();
+    if (touchState.gestureResetTimeoutId !== null) {
+      window.clearTimeout(touchState.gestureResetTimeoutId);
+      touchState.gestureResetTimeoutId = null;
+    }
+    touchState.id = null;
+    touchState.startClientX = 0;
+    touchState.startClientY = 0;
+    touchState.lastClientX = 0;
+    touchState.lastClientY = 0;
+    touchState.gestureUsed = false;
+    stopTouchMovement();
+  };
+
+  const resetExtraSwipeState = () => {
+    extraSwipeState.id = null;
+    extraSwipeState.startClientX = 0;
+    extraSwipeState.startClientY = 0;
+    extraSwipeState.lastClientX = 0;
+    extraSwipeState.lastClientY = 0;
+    extraSwipeState.gestureUsed = false;
+  };
+
+  const queueGestureReset = () => {
+    if (touchState.gestureResetTimeoutId !== null) {
+      window.clearTimeout(touchState.gestureResetTimeoutId);
+    }
+    touchState.gestureResetTimeoutId = window.setTimeout(() => {
+      if (touchState.id !== null) {
+        touchState.gestureUsed = false;
+        touchState.startClientX = touchState.lastClientX;
+        touchState.startClientY = touchState.lastClientY;
+      }
+      touchState.gestureResetTimeoutId = null;
+    }, TOUCH_GESTURE_RESET_MS);
+  };
+
+  const getDirectionFromClientX = (clientX) => {
+    const rect = canvas.getBoundingClientRect();
+    if (!rect || rect.width === 0) {
+      return 0;
+    }
+    const relativeX = clientX - rect.left;
+    const clampedX = Math.min(Math.max(relativeX, 0), rect.width);
+    return clampedX < rect.width / 2 ? -1 : 1;
+  };
+
+  const scheduleMovementActivation = () => {
+    clearMovementTimeout();
+    touchState.moveTimeoutId = window.setTimeout(() => {
+      if (touchState.id === null || touchState.gestureUsed) {
+        touchState.moveTimeoutId = null;
+        return;
+      }
+      const direction = getDirectionFromClientX(touchState.lastClientX);
+      if (direction !== 0) {
+        isTouchMoving = true;
+        touchMoveDirection = direction;
+        dashDirection = direction;
+      }
+      touchState.moveTimeoutId = null;
+    }, TOUCH_MOVE_DELAY_MS);
+  };
+
+  const handleSwipe = (
+    deltaX,
+    deltaY,
+    { preserveMovement = false, allowVerticalPriority = false } = {}
+  ) => {
+    if (touchState.gestureUsed) {
+      return false;
+    }
+
+    const absX = Math.abs(deltaX);
+    const absY = Math.abs(deltaY);
+
+    const consumeSwipe = () => {
+      touchState.gestureUsed = true;
+      if (preserveMovement && isTouchMoving) {
+        queueGestureReset();
+      } else {
+        clearMovementTimeout();
+        stopTouchMovement();
+      }
+    };
+
+    const verticalDominant =
+      absY >= TOUCH_SWIPE_THRESHOLD &&
+      (absY > absX || (allowVerticalPriority && absY > TOUCH_SWIPE_THRESHOLD));
+
+    if (deltaY <= -TOUCH_SWIPE_THRESHOLD && verticalDominant) {
+      consumeSwipe();
+      attemptJump();
+      return true;
+    }
+
+    const horizontalDominant =
+      absX >= TOUCH_SWIPE_THRESHOLD &&
+      absX >= (allowVerticalPriority ? absY * 0.5 : absY);
+
+    if (horizontalDominant) {
+      consumeSwipe();
+      attemptDash(deltaX > 0 ? 1 : -1);
+      return true;
+    }
+
+    return false;
+  };
+
+  const findTouchById = (touchList, id) => {
+    if (id === null) {
+      return null;
+    }
+    for (let i = 0; i < touchList.length; i++) {
+      if (touchList[i].identifier === id) {
+        return touchList[i];
+      }
+    }
+    return null;
+  };
+
+  const assignMovementTouch = (touch) => {
+    touchState.id = touch.identifier;
+    touchState.startClientX = touch.clientX;
+    touchState.startClientY = touch.clientY;
+    touchState.lastClientX = touch.clientX;
+    touchState.lastClientY = touch.clientY;
+    touchState.gestureUsed = false;
+    scheduleMovementActivation();
+  };
+
+  const assignExtraSwipeTouch = (touch) => {
+    extraSwipeState.id = touch.identifier;
+    extraSwipeState.startClientX = touch.clientX;
+    extraSwipeState.startClientY = touch.clientY;
+    extraSwipeState.lastClientX = touch.clientX;
+    extraSwipeState.lastClientY = touch.clientY;
+    extraSwipeState.gestureUsed = false;
+  };
+
+  canvas.addEventListener(
+    "touchstart",
+    (event) => {
+      for (let i = 0; i < event.changedTouches.length; i++) {
+        const touch = event.changedTouches[i];
+        if (!touch) continue;
+
+        if (touchState.id === null) {
+          assignMovementTouch(touch);
+          if (extraSwipeState.id !== null) {
+            break;
+          }
+          continue;
+        }
+
+        if (extraSwipeState.id === null) {
+          assignExtraSwipeTouch(touch);
+          if (touchState.id !== null) {
+            break;
+          }
+        }
+      }
+    },
+    false
+  );
+
+  const handleExtraSwipeMove = (touch) => {
+    if (extraSwipeState.id === null || extraSwipeState.gestureUsed) {
+      return;
+    }
+
+    const deltaX = touch.clientX - extraSwipeState.startClientX;
+    const deltaY = touch.clientY - extraSwipeState.startClientY;
+    extraSwipeState.lastClientX = touch.clientX;
+    extraSwipeState.lastClientY = touch.clientY;
+
+    const absX = Math.abs(deltaX);
+    const absY = Math.abs(deltaY);
+
+    if (
+      absY >= TOUCH_SWIPE_THRESHOLD &&
+      absY >= absX &&
+      deltaY <= -TOUCH_SWIPE_THRESHOLD
+    ) {
+      extraSwipeState.gestureUsed = true;
+      attemptJump();
+      return;
+    }
+
+    if (absX >= TOUCH_SWIPE_THRESHOLD && absX >= absY * 0.5) {
+      extraSwipeState.gestureUsed = true;
+      attemptDash(deltaX > 0 ? 1 : -1);
+    }
+  };
+
+  canvas.addEventListener(
+    "touchmove",
+    (event) => {
+      const moveTouch = findTouchById(event.changedTouches, touchState.id);
+      if (moveTouch) {
+        const deltaX = moveTouch.clientX - touchState.startClientX;
+        const deltaY = moveTouch.clientY - touchState.startClientY;
+
+        touchState.lastClientX = moveTouch.clientX;
+        touchState.lastClientY = moveTouch.clientY;
+
+        if (
+          handleSwipe(deltaX, deltaY, {
+            preserveMovement: isTouchMoving,
+            allowVerticalPriority: isTouchMoving,
+          })
+        ) {
+          return;
+        }
+
+        if (isTouchMoving && !touchState.gestureUsed) {
+          const newDirection = getDirectionFromClientX(moveTouch.clientX);
+          if (newDirection !== 0 && newDirection !== touchMoveDirection) {
+            touchMoveDirection = newDirection;
+            dashDirection = newDirection;
+          }
+        }
+      }
+
+      const extraTouch = findTouchById(
+        event.changedTouches,
+        extraSwipeState.id
+      );
+      if (extraTouch) {
+        handleExtraSwipeMove(extraTouch);
+      }
+    },
+    false
+  );
+
+  const handleTouchEnd = (event) => {
+    const moveTouch = findTouchById(event.changedTouches, touchState.id);
+    const extraTouch = findTouchById(event.changedTouches, extraSwipeState.id);
+
+    if (moveTouch) {
+      resetTouchState();
+    }
+
+    if (extraTouch) {
+      resetExtraSwipeState();
+    }
+  };
+
+  canvas.addEventListener("touchend", handleTouchEnd, false);
+  canvas.addEventListener("touchcancel", handleTouchEnd, false);
+}
+
 // --- Start Game ---
+setupTouchControls();
 loadLevel(0);
