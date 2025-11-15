@@ -1,0 +1,18 @@
+{
+	"name": "gaia-i-les-fulles-del-coneixement",
+	"type": "module",
+	"scripts": {
+		"build": "vite build",
+		"dev": "vite",
+		"preview": "vite preview",
+		"zip": "npm run build && mkdir -p dist && zip -r dist/game.zip dist -x \"**/.DS_Store\""
+	},
+	"dependencies": {
+		"kaplay": "3001.0.0"
+	},
+	"devDependencies": {
+		"@types/node": "^24.9.2",
+		"vite": "^7.1.12"
+	},
+	"packageManager": "yarn@3.6.1+sha512.de524adec81a6c3d7a26d936d439d2832e351cdfc5728f9d91f3fc85dd20b04391c038e9b4ecab11cae2b0dd9f0d55fd355af766bc5c1a7f8d25d96bb2a0b2ca"
+}
