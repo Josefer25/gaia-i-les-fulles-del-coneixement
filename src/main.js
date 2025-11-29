@@ -15,7 +15,9 @@ const k = kaplay({
 });
 
 // --- Càrrega de Sprites ---
-k.loadSprite("bean", "/sprites/bean.png");
+k.loadSprite("gaia_still", "/sprites/gaia/still.png");
+k.loadSprite("gaia_moving1", "/sprites/gaia/moving1.png");
+k.loadSprite("gaia_moving2", "/sprites/gaia/moving2.png");
 k.loadSprite("steel", "/sprites/steel.png");
 k.loadSprite("grass", "/sprites/grass.png");
 k.loadSprite("coin", "/sprites/coin.png");
@@ -223,7 +225,8 @@ k.onAdd("portal_anim", (portal) => {
 function getTileDefinitions() {
   return {
     "@": () => [
-      k.sprite("bean"),
+      k.sprite("gaia_still"),
+      k.scale(0.25),
       k.area(),
       k.body(),
       k.anchor("bot"),
@@ -318,6 +321,19 @@ function loadLevel(levelIndex) {
   // Get player and set start position
   player = level.get("player")[0];
   startPos = player.pos.clone();
+
+  // Ensure player has correct scale (make it smaller)
+  if (!player.scale || player.scale.x !== 0.25) {
+    player.scale = k.vec2(0.25, 0.25);
+  }
+
+  // Initialize animation state
+  if (!player.animTime) {
+    player.animTime = 0;
+  }
+  if (!player.isMoving) {
+    player.isMoving = false;
+  }
 
   // Reset dash ability when level loads
   canDash = false;
@@ -645,9 +661,59 @@ k.onUpdate(() => {
 
   if (!player) return;
 
+  // Update animation state
+  const isMovingHorizontally =
+    Math.abs(player.vel.x) > 10 ||
+    k.isKeyDown("left") ||
+    k.isKeyDown("right") ||
+    (isTouchMoving && touchMoveDirection !== 0);
+
   if (!isDashing && isTouchMoving && touchMoveDirection !== 0) {
     player.move(touchMoveDirection * SPEED, 0);
     dashDirection = touchMoveDirection;
+  }
+
+  // Handle sprite animation and flipping (only when not dashing, as dash has its own visual effect)
+  if (!isDashing) {
+    // Determine movement direction for flipping
+    const moveDir =
+      player.vel.x !== 0
+        ? player.vel.x > 0
+          ? 1
+          : -1
+        : k.isKeyDown("right") || (isTouchMoving && touchMoveDirection > 0)
+        ? 1
+        : k.isKeyDown("left") || (isTouchMoving && touchMoveDirection < 0)
+        ? -1
+        : 0;
+
+    // Flip sprite horizontally when moving left
+    if (moveDir < 0) {
+      player.scale.x = -Math.abs(player.scale.x);
+    } else if (moveDir > 0) {
+      player.scale.x = Math.abs(player.scale.x);
+    }
+
+    if (isMovingHorizontally && player.isGrounded()) {
+      // Animate between moving1 and moving2
+      player.animTime += k.dt();
+      const animSpeed = 0.15; // Time per frame
+      const frame = Math.floor(player.animTime / animSpeed) % 2;
+      const targetSprite = frame === 0 ? "gaia_moving1" : "gaia_moving2";
+
+      // Check current sprite and switch if needed
+      const currentSprite = player.sprite;
+      if (!currentSprite || currentSprite.name !== targetSprite) {
+        player.use(k.sprite(targetSprite));
+      }
+    } else {
+      // Use still sprite
+      const currentSprite = player.sprite;
+      if (!currentSprite || currentSprite.name !== "gaia_still") {
+        player.use(k.sprite("gaia_still"));
+      }
+      player.animTime = 0;
+    }
   }
 
   // Reset dash when player lands
@@ -664,7 +730,9 @@ k.onUpdate(() => {
     }
     // Restaurar escala i rotació si estaven modificades
     if (player.scale) {
-      player.scale = k.vec2(1, 1);
+      const currentScaleX = player.scale.x;
+      // Preserve horizontal flip direction
+      player.scale = k.vec2(currentScaleX < 0 ? -0.25 : 0.25, 0.25);
     }
     player.angle = 0;
     if (player.opacity !== undefined) {
@@ -752,17 +820,22 @@ function attemptDash(directionOverride) {
       ? dashDirection
       : 1;
 
-  const originalScale = player.scale ? player.scale.clone() : k.vec2(1, 1);
+  const originalScale = player.scale
+    ? player.scale.clone()
+    : k.vec2(0.25, 0.25);
   const originalOpacity = player.opacity !== undefined ? player.opacity : 1;
-  const stretchX = dashDir > 0 ? 1.5 : 0.6;
-  const stretchY = 0.7;
+  const baseScaleX = Math.abs(originalScale.x);
+  const stretchX = dashDir > 0 ? baseScaleX * 1.5 : baseScaleX * 0.6; // Relative to base scale
+  const stretchY = baseScaleX * 0.7; // Relative to base scale
+  // Preserve horizontal flip direction
+  const finalStretchX = originalScale.x < 0 ? -stretchX : stretchX;
   const rotationAmount = dashDir * 0.4;
 
   player.vel.x = dashDir * DASH_SPEED;
   isDashing = true;
   canDash = false;
 
-  player.scale = k.vec2(stretchX, stretchY);
+  player.scale = k.vec2(finalStretchX, stretchY);
   player.angle = rotationAmount;
   player.opacity = 0.9;
 
@@ -782,8 +855,15 @@ function attemptDash(directionOverride) {
 
     const progress = dashTime / DASH_DURATION;
     const easeOut = 1 - Math.pow(1 - progress, 3);
-    const currentScaleX = k.lerp(stretchX, originalScale.x, easeOut);
+    const currentScaleXAbs = k.lerp(
+      Math.abs(finalStretchX),
+      Math.abs(originalScale.x),
+      easeOut
+    );
     const currentScaleY = k.lerp(stretchY, originalScale.y, easeOut);
+    // Preserve horizontal flip direction
+    const currentScaleX =
+      originalScale.x < 0 ? -currentScaleXAbs : currentScaleXAbs;
     player.scale = k.vec2(currentScaleX, currentScaleY);
     player.angle = k.lerp(rotationAmount, 0, easeOut);
     player.opacity = k.lerp(0.9, originalOpacity, easeOut);
