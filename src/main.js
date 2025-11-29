@@ -825,11 +825,11 @@ function attemptDash(directionOverride) {
     : k.vec2(0.25, 0.25);
   const originalOpacity = player.opacity !== undefined ? player.opacity : 1;
   const baseScaleX = Math.abs(originalScale.x);
-  const stretchX = dashDir > 0 ? baseScaleX * 1.5 : baseScaleX * 0.6; // Relative to base scale
-  const stretchY = baseScaleX * 0.7; // Relative to base scale
+  const stretchX = dashDir > 0 ? baseScaleX * 2.0 : baseScaleX * 0.5; // More exaggerated stretch
+  const stretchY = baseScaleX * 0.5; // More exaggerated squash
   // Preserve horizontal flip direction
   const finalStretchX = originalScale.x < 0 ? -stretchX : stretchX;
-  const rotationAmount = dashDir * 0.4;
+  const rotationAmount = dashDir * 0.2; // Reduced rotation for cleaner look with moving sprite
 
   player.vel.x = dashDir * DASH_SPEED;
   isDashing = true;
@@ -845,6 +845,9 @@ function attemptDash(directionOverride) {
     dashUpdateHandler.cancel();
   }
 
+  // Force moving sprite for dash
+  player.use(k.sprite("gaia_moving2"));
+
   dashUpdateHandler = player.onUpdate(() => {
     if (!isDashing) {
       return;
@@ -853,8 +856,37 @@ function attemptDash(directionOverride) {
     dashTime += k.dt();
     player.vel.y += GRAVITY * k.dt();
 
+    // Spawn trail ghosts
+    if (dashTime % 0.05 < k.dt()) {
+      // Spawn roughly every 0.05s
+      const ghost = k.add([
+        k.sprite("gaia_moving2"),
+        k.pos(player.pos),
+        k.scale(player.scale),
+        k.anchor("bot"),
+        k.opacity(0.5),
+        k.z(1), // Behind player
+        "ghost_trail",
+      ]);
+      // Flip ghost if player is flipped
+      ghost.scale.x = player.scale.x;
+
+      // Fade out ghost
+      k.tween(
+        0.5,
+        0,
+        0.3,
+        (val) => (ghost.opacity = val),
+        k.easings.easeOutQuad
+      ).onEnd(() => {
+        ghost.destroy();
+      });
+    }
+
     const progress = dashTime / DASH_DURATION;
-    const easeOut = 1 - Math.pow(1 - progress, 3);
+    // Use a more dynamic ease for recovery
+    const easeOut = 1 - Math.pow(1 - progress, 5); // Quintic ease out for snappiness
+
     const currentScaleXAbs = k.lerp(
       Math.abs(finalStretchX),
       Math.abs(originalScale.x),
@@ -873,6 +905,7 @@ function attemptDash(directionOverride) {
       player.scale = originalScale;
       player.angle = 0;
       player.opacity = originalOpacity;
+      // Sprite will be reset by main loop
       if (dashUpdateHandler) {
         dashUpdateHandler.cancel();
         dashUpdateHandler = null;
