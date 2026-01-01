@@ -399,7 +399,7 @@ function loadLevel(levelIndex) {
 
   // Reset camera position to player position
   currentCamPos = player.worldPos();
-  k.setCamPos(currentCamPos);
+  k.camPos(currentCamPos);
 
   // Setup enemy patrol
   k.wait(0, () => {
@@ -622,53 +622,102 @@ function showVictoryScreen() {
     k.color(100, 100, 100),
   ]);
 
-  // Botons de compartir
-  const shareText = `He completat Gaia i les Fulles del Coneixement en ${formatTime(
-    gameTime
-  )} amb ${coinCount} fulles! 🍃✨`;
-  const encodedText = encodeURIComponent(shareText);
+  // Dades per compartir
+  const shareData = {
+    title: "Gaia i les Fulles del Coneixement",
+    text: `He completat Gaia i les Fulles del Coneixement en ${formatTime(
+      gameTime
+    )} amb ${coinCount} fulles! 🍃✨`,
+    url: window.location.href, // Comparteix la URL del joc
+  };
 
-  // Botó Instagram
-  const instagramBtn = container.add([
-    k.rect(180, 60),
-    k.color(225, 48, 108), // Color Instagram
-    k.pos(-100, GAME_HEIGHT * 0.3),
+  // --- LÒGICA DE COMPARTIR ---
+
+  // Detectem si el navegador suporta l'API nativa de compartir (Mòbils/Tablets)
+  if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+    // BOTÓ ÚNIC "COMPARTIR" (Natiu)
+    const shareBtn = container.add([
+      k.rect(260, 80),
+      k.color(50, 200, 50), // Verd
+      k.pos(0, GAME_HEIGHT * 0.3),
+      k.anchor("center"),
+      k.area(),
+      k.outline(3, k.color(0, 0, 0)),
+    ]);
+
+    shareBtn.add([
+      k.text("Compartir", { size: 36 }),
+      k.anchor("center"),
+      k.color(255, 255, 255),
+    ]);
+
+    shareBtn.onClick(async () => {
+      try {
+        await navigator.share(shareData);
+      } catch (err) {
+        console.error("Error compartint:", err);
+      }
+    });
+  } else {
+    // FALLBACK PER A PC (Instagram/Twitter Botons separats)
+    // Això s'executa si estem a PC on no hi ha menú natiu de compartir
+
+    const encodedText = encodeURIComponent(shareData.text);
+
+    // Botó Instagram
+    // NOTA: Instagram web no permet compartir text fàcilment, només obre la web
+    const instagramBtn = container.add([
+      k.rect(180, 60),
+      k.color(225, 48, 108),
+      k.pos(-100, GAME_HEIGHT * 0.3),
+      k.anchor("center"),
+      k.area(),
+      k.outline(3, k.color(0, 0, 0)),
+    ]);
+
+    instagramBtn.add([
+      k.text("Instagram", { size: 28 }),
+      k.anchor("center"),
+      k.color(255, 255, 255),
+    ]);
+
+    instagramBtn.onClick(() => {
+      window.open(`https://www.instagram.com/`, "_blank");
+    });
+
+    // Botó Twitter/X
+    const twitterBtn = container.add([
+      k.rect(180, 60),
+      k.color(29, 161, 242),
+      k.pos(100, GAME_HEIGHT * 0.3),
+      k.anchor("center"),
+      k.area(),
+      k.outline(3, k.color(0, 0, 0)),
+    ]);
+
+    twitterBtn.add([
+      k.text("Twitter/X", { size: 28 }),
+      k.anchor("center"),
+      k.color(255, 255, 255),
+    ]);
+
+    twitterBtn.onClick(() => {
+      const url = `https://twitter.com/intent/tweet?text=${encodedText}`;
+      window.open(url, "_blank");
+    });
+  }
+
+  // Botó per tornar a jugar (Opcional, bona pràctica)
+  const replayBtn = container.add([
+    k.text("Tornar a jugar", { size: 24 }),
+    k.pos(0, GAME_HEIGHT * 0.42),
     k.anchor("center"),
+    k.color(0, 0, 0),
     k.area(),
-    k.outline(3, k.color(0, 0, 0)),
   ]);
 
-  instagramBtn.add([
-    k.text("Instagram", { size: 28 }),
-    k.anchor("center"),
-    k.color(255, 255, 255),
-  ]);
-
-  instagramBtn.onClick(() => {
-    // Instagram no té API directa, obrim la web amb el text
-    const url = `https://www.instagram.com/create/story/?text=${encodedText}`;
-    window.open(url, "_blank");
-  });
-
-  // Botó Twitter/X
-  const twitterBtn = container.add([
-    k.rect(180, 60),
-    k.color(29, 161, 242), // Color Twitter
-    k.pos(100, GAME_HEIGHT * 0.3),
-    k.anchor("center"),
-    k.area(),
-    k.outline(3, k.color(0, 0, 0)),
-  ]);
-
-  twitterBtn.add([
-    k.text("Twitter/X", { size: 28 }),
-    k.anchor("center"),
-    k.color(255, 255, 255),
-  ]);
-
-  twitterBtn.onClick(() => {
-    const url = `https://twitter.com/intent/tweet?text=${encodedText}`;
-    window.open(url, "_blank");
+  replayBtn.onClick(() => {
+    location.reload();
   });
 }
 
@@ -817,7 +866,7 @@ k.onUpdate(() => {
   currentCamPos.x += dx;
   currentCamPos.y += dy;
 
-  k.setCamPos(currentCamPos);
+  k.camPos(currentCamPos);
 
   // Parallax scrolling - use smooth camera position
   for (const layer of parallaxLayers) {
