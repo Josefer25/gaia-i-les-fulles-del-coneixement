@@ -15,9 +15,16 @@ const k = kaplay({
 });
 
 // --- Càrrega de Sprites ---
-k.loadSprite("gaia_still", "/sprites/gaia/still.png");
-k.loadSprite("gaia_moving1", "/sprites/gaia/moving1.png");
-k.loadSprite("gaia_moving2", "/sprites/gaia/moving2.png");
+// Gaia per nivell
+k.loadSprite("gaia_l1_still", "/sprites/gaia/l1/still.png");
+k.loadSprite("gaia_l1_moving1", "/sprites/gaia/l1/moving1.png");
+k.loadSprite("gaia_l1_moving2", "/sprites/gaia/l1/moving2.png");
+k.loadSprite("gaia_l2_still", "/sprites/gaia/l2/still.png");
+k.loadSprite("gaia_l2_moving1", "/sprites/gaia/l2/moving1.png");
+k.loadSprite("gaia_l2_moving2", "/sprites/gaia/l2/moving2.png");
+k.loadSprite("gaia_l3_still", "/sprites/gaia/l3/still.png");
+k.loadSprite("gaia_l3_moving1", "/sprites/gaia/l3/moving1.png");
+k.loadSprite("gaia_l3_moving2", "/sprites/gaia/l3/moving2.png");
 k.loadSprite("steel", "/sprites/steel.png");
 k.loadSprite("grass", "/sprites/grass.png");
 k.loadSprite("coin", "/sprites/llibre.png");
@@ -70,6 +77,32 @@ let canDash = false; // Si el jugador pot fer dash
 let isDashing = false; // Si el jugador està fent dash
 let dashDirection = 0; // Direcció del dash (-1 esquerra, 1 dreta, 0 cap avall)
 let dashUpdateHandler = null; // Handler per cancel·lar l'actualització del dash
+let currentGaiaSprites = {
+  still: "gaia_l1_still",
+  moving1: "gaia_l1_moving1",
+  moving2: "gaia_l1_moving2",
+};
+const gaiaSpriteSets = [
+  {
+    still: "gaia_l1_still",
+    moving1: "gaia_l1_moving1",
+    moving2: "gaia_l1_moving2",
+  },
+  {
+    still: "gaia_l2_still",
+    moving1: "gaia_l2_moving1",
+    moving2: "gaia_l2_moving2",
+  },
+  {
+    still: "gaia_l3_still",
+    moving1: "gaia_l3_moving1",
+    moving2: "gaia_l3_moving2",
+  },
+];
+function setGaiaSpriteSet(levelIndex) {
+  const idx = Math.min(Math.max(levelIndex, 0), gaiaSpriteSets.length - 1);
+  currentGaiaSprites = gaiaSpriteSets[idx];
+}
 
 const touchState = {
   id: null,
@@ -227,7 +260,7 @@ k.onAdd("portal_anim", (portal) => {
 function getTileDefinitions() {
   return {
     "@": () => [
-      k.sprite("gaia_still"),
+      k.sprite(currentGaiaSprites.still),
       k.scale(0.25),
       k.area(),
       k.body(),
@@ -296,6 +329,9 @@ function loadLevel(levelIndex) {
     k.debug.log("No more levels!");
     return;
   }
+
+  // Set Gaia sprites for this level
+  setGaiaSpriteSet(levelIndex);
 
   // Crear capes de parallax per aquest nivell
   // Esperar que els sprites estiguin carregats
@@ -716,7 +752,8 @@ k.onUpdate(() => {
       player.animTime += k.dt();
       const animSpeed = 0.15; // Time per frame
       const frame = Math.floor(player.animTime / animSpeed) % 2;
-      const targetSprite = frame === 0 ? "gaia_moving1" : "gaia_moving2";
+      const targetSprite =
+        frame === 0 ? currentGaiaSprites.moving1 : currentGaiaSprites.moving2;
 
       // Check current sprite and switch if needed
       const currentSprite = player.sprite;
@@ -726,8 +763,8 @@ k.onUpdate(() => {
     } else {
       // Use still sprite
       const currentSprite = player.sprite;
-      if (!currentSprite || currentSprite.name !== "gaia_still") {
-        player.use(k.sprite("gaia_still"));
+      if (!currentSprite || currentSprite.name !== currentGaiaSprites.still) {
+        player.use(k.sprite(currentGaiaSprites.still));
       }
       player.animTime = 0;
     }
@@ -863,7 +900,7 @@ function attemptDash(directionOverride) {
   }
 
   // Force moving sprite for dash
-  player.use(k.sprite("gaia_moving2"));
+  player.use(k.sprite(currentGaiaSprites.moving2));
 
   dashUpdateHandler = player.onUpdate(() => {
     if (!isDashing) {
@@ -877,7 +914,7 @@ function attemptDash(directionOverride) {
     if (dashTime % 0.05 < k.dt()) {
       // Spawn roughly every 0.05s
       const ghost = k.add([
-        k.sprite("gaia_moving2"),
+        k.sprite(currentGaiaSprites.moving2),
         k.pos(player.pos),
         k.scale(player.scale),
         k.anchor("bot"),

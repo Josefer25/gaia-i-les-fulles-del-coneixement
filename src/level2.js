@@ -1,38 +1,71 @@
-// Level 2 - Simple level
+const WIDTH = 76;
+const r = (s) => s.padEnd(WIDTH, " ");
+
+// Level 2 - Two lanes with gentle gaps and elevated coins
 export const level2 = {
   id: 1,
-  name: "Nivell 2",
+  name: "Nivell 2: Steel Horizons",
   map: [
-    "                                                                                                                                  ",
-    "                                                                                                                                  ",
-    "                                                                                                                                  ",
-    "                                                                                                                                  ",
-    "                                                                                                                                  ",
-    "                                                                                                                                  ",
-    "                                                                                                                                  ",
-    "                                                                                                                                  ",
-    "                                                                                                                                  ",
-    "                                                                                                                                  ",
-    "                                                                                                                                  ",
-    "                                                                                                                                  ",
-    "                                                                                                                                  ",
-    "                                                                                                                                  ",
-    "                                                                                                                                  ",
-    "                                                                                                                                  ",
-    "                                                                                                                                  ",
-    "                                                                                                                                  ",
-    "                                                                                                                                  ",
-    "                                                                                                                                  ",
-    "                                                                                                                                  ",
-    "                                                                                                                            ^     ",
-    "    @                                                                                                                      ======",
-    "====================================================================================================================================",
+    r(""),
+    r(""),
+    // High Road (Roofs) - Requires climbing
+    r(
+      "                                                               $  $  $                                                       "
+    ),
+    r(
+      "                                                                                                                             "
+    ),
+    r(
+      "                                                            ###########                                                      "
+    ),
+    r(
+      "               $  $                                                                    $    $                                "
+    ),
+    r(
+      "                                                     f                           f                                           "
+    ),
+    r(
+      "           ############        ####                #####                       #####            #######                      "
+    ),
+    r(
+      "                                                                                                          $                  "
+    ),
+    r(
+      "                                         $   $               $   $                       g                f                  "
+    ),
+    r(
+      "                                                                                     #######          ########               "
+    ),
+    r(
+      "                                       #########                                                                             "
+    ),
+    r(
+      "      $                 f                                                                                       $   $        "
+    ),
+    r(
+      "                     #######                          g                g                                                     "
+    ),
+    r(
+      " @         g                           g          ##########       ##########                                 #########      "
+    ),
+    r(
+      "##################            ####################                                ########################  ##         ##   ^"
+    ),
+    r(
+      "##################            ####################                                ########################  ##         ######"
+    ),
   ],
   welcomeMessage: {
-    title: "Nivell 2",
-    text: "Has arribat al segon nivell!\nContinua endavant per a descobrir més secrets.",
+    title: "La Ciutat d'Acer",
+    text: "Vigila els buits!\nA vegades el camí de dalt és més segur...",
   },
-  // Sprites needed for this level
-  sprites: ["bean", "grass", "portal"],
+  sprites: [
+    "gaia_still",
+    "steel",
+    "grass",
+    "coin",
+    "ghosty",
+    "portal",
+    "flag2",
+  ],
 };
-
