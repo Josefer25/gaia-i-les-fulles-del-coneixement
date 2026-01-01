@@ -20,9 +20,11 @@ k.loadSprite("gaia_moving1", "/sprites/gaia/moving1.png");
 k.loadSprite("gaia_moving2", "/sprites/gaia/moving2.png");
 k.loadSprite("steel", "/sprites/steel.png");
 k.loadSprite("grass", "/sprites/grass.png");
-k.loadSprite("coin", "/sprites/coin.png");
+k.loadSprite("coin", "/sprites/llibre.png");
 k.loadSprite("ghosty", "/sprites/ghosty.png");
 k.loadSprite("portal", "/sprites/portal.png");
+k.loadSprite("flag1", "/sprites/flag1.png");
+k.loadSprite("flag2", "/sprites/flag2.png");
 
 // Carregar fons de Nature (Nivell 1)
 k.loadSprite("nature1", "/sprites/backgrounds/nature/1.png");
@@ -247,7 +249,14 @@ function getTileDefinitions() {
       k.anchor("bot"),
       "wall",
     ],
-    $: () => [k.sprite("coin"), k.area(), k.anchor("center"), k.z(1), "coin"],
+    $: () => [
+      k.sprite("coin"),
+      k.scale(0.2),
+      k.area(),
+      k.anchor("center"),
+      k.z(1),
+      "coin",
+    ],
     g: () => [
       k.sprite("ghosty"),
       k.pos(),
@@ -263,6 +272,14 @@ function getTileDefinitions() {
       k.z(1),
       "portal",
       "portal_anim", // Etiqueta per a l'animació
+    ],
+    f: () => [
+      k.sprite(Math.random() > 0.5 ? "flag1" : "flag2"),
+      k.scale(0.3),
+      k.area(),
+      k.anchor("bot"),
+      k.z(1),
+      "flag",
     ],
   };
 }
