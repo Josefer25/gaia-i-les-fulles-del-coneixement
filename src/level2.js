@@ -57,7 +57,7 @@ export const level2 = {
   ],
   welcomeMessage: {
     title: "La Ciutat d'Acer",
-    text: "Vigila els buits!\nA vegades el camí de dalt és més segur...",
+    text: "Vigila els buits!\nDe vegades el camí de dalt és més segur...",
   },
   sprites: [
     "gaia_still",
