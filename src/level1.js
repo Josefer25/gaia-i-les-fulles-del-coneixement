@@ -62,7 +62,7 @@ export const level1 = {
   ],
   welcomeMessage: {
     title: "Benvingut a Gaia!",
-    text: "Moute amb els teus dits a la pantalla. \n Salta deslitzant amunt. \n Fes servir el DASH amb un swipe horitzontal.\n Recolleix fulles per augmentar la teva puntuació.",
+    text: "Moute amb els teus dits a la pantalla. \n Salta deslitzant amunt. \n Fes servir el DASH amb un swipe horitzontal.\n Recolleix fulls per augmentar la teva puntuació.",
   },
   sprites: [
     "gaia_still",

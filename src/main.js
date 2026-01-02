@@ -519,7 +519,7 @@ function loadLevel(levelIndex) {
     // Coin collection
     player.onCollide("coin", (coin) => {
       coinCount++;
-      coinText.text = `Fulles: ${coinCount}`;
+      coinText.text = `Fulls: ${coinCount}`;
       coin.destroy();
     });
 
@@ -608,7 +608,7 @@ function showVictoryScreen() {
 
   // Fulles
   container.add([
-    k.text(`Fulles: ${coinCount}`, { size: 48 }),
+    k.text(`Fulls: ${coinCount}`, { size: 48 }),
     k.pos(0, GAME_HEIGHT * 0.05),
     k.anchor("center"),
     k.color(0, 0, 0),
@@ -624,10 +624,10 @@ function showVictoryScreen() {
 
   // Dades per compartir
   const shareData = {
-    title: "Gaia i les Fulles del Coneixement",
-    text: `He completat Gaia i les Fulles del Coneixement en ${formatTime(
+    title: "Gaia i els Fulls del Coneixement",
+    text: `He completat Gaia i els Fulls del Coneixement en ${formatTime(
       gameTime
-    )} amb ${coinCount} fulles! 🍃✨`,
+    )} amb ${coinCount} fulls! 🍃✨`,
     url: window.location.href, // Comparteix la URL del joc
   };
 
@@ -723,7 +723,7 @@ function showVictoryScreen() {
 
 // --- Initialize UI ---
 coinText = k.add([
-  k.text("Fulles: 0", { size: 48 }),
+  k.text("Fulls: 0", { size: 48 }),
   k.pos(30, 30),
   k.fixed(),
   k.z(100),
