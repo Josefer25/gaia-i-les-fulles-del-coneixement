@@ -71,6 +71,8 @@ let currentLevelIndex = 0;
 let level = null;
 let player = null;
 let startPos = null;
+let checkpointPos = null; // Last checkpoint position
+let activatedFlags = new Set(); // Track which flags have been activated
 let coinCount = 0;
 let coinText = null;
 let canDash = false; // Si el jugador pot fer dash
@@ -374,6 +376,8 @@ function loadLevel(levelIndex) {
   // Get player and set start position
   player = level.get("player")[0];
   startPos = player.pos.clone();
+  checkpointPos = null; // Reset checkpoint for new level
+  activatedFlags.clear(); // Clear activated flags for new level
 
   // Ensure player has correct scale (make it smaller)
   if (!player.scale || player.scale.x !== 0.25) {
@@ -523,9 +527,82 @@ function loadLevel(levelIndex) {
       coin.destroy();
     });
 
+    // Flag checkpoint system
+    player.onCollide("flag", (flag) => {
+      // Check if this flag has already been activated
+      const flagId = flag._id || flag.id; // Use kaplay's internal ID
+
+      if (activatedFlags.has(flagId)) {
+        return; // Already activated, do nothing
+      }
+
+      // Mark as activated
+      activatedFlags.add(flagId);
+
+      // Set checkpoint
+      checkpointPos = flag.pos.clone();
+
+      // Celebration animation - bounce up
+      const originalY = flag.pos.y;
+      k.tween(
+        flag.pos.y,
+        originalY - 30,
+        0.2,
+        (y) => (flag.pos.y = y),
+        k.easings.easeOutQuad
+      ).onEnd(() => {
+        // Bounce back down
+        k.tween(
+          flag.pos.y,
+          originalY,
+          0.3,
+          (y) => (flag.pos.y = y),
+          k.easings.easeOutBounce
+        );
+      });
+
+      // Scale animation - pulse
+      const originalScale = flag.scale ? flag.scale.clone() : k.vec2(0.3, 0.3);
+      k.tween(
+        flag.scale || k.vec2(0.3, 0.3),
+        k.vec2(originalScale.x * 1.3, originalScale.y * 1.3),
+        0.15,
+        (s) => (flag.scale = s),
+        k.easings.easeOutQuad
+      ).onEnd(() => {
+        k.tween(
+          flag.scale,
+          originalScale,
+          0.15,
+          (s) => (flag.scale = s),
+          k.easings.easeInQuad
+        );
+      });
+
+      // Add permanent glow effect
+      flag.glowTime = 0;
+      flag.isCheckpoint = true;
+
+      // Add glow component that pulses
+      if (!flag.glowUpdate) {
+        flag.glowUpdate = flag.onUpdate(() => {
+          if (flag.isCheckpoint) {
+            flag.glowTime += k.dt();
+            // Pulse opacity between 0.7 and 1.0
+            const glowValue = 0.85 + Math.sin(flag.glowTime * 3) * 0.15;
+            flag.opacity = glowValue;
+          }
+        });
+      }
+    });
+
     // Enemy collision - death
     player.onCollide("enemy", () => {
-      player.pos = startPos.clone();
+      // Respawn at checkpoint if available, otherwise at start
+      const respawnPos = checkpointPos
+        ? checkpointPos.clone()
+        : startPos.clone();
+      player.pos = respawnPos;
       player.vel.x = 0;
       player.vel.y = 0;
     });
@@ -878,7 +955,9 @@ k.onUpdate(() => {
   // Reset if player falls
   const failThreshold = 2500;
   if (player.pos.y > failThreshold) {
-    player.pos = startPos.clone();
+    // Respawn at checkpoint if available, otherwise at start
+    const respawnPos = checkpointPos ? checkpointPos.clone() : startPos.clone();
+    player.pos = respawnPos;
     player.vel.x = 0;
     player.vel.y = 0;
     // Reset camera position too
