@@ -4,13 +4,16 @@ import { createWelcomeScreen } from "./welcomeScreen.js";
 import { setupPatrolSystem } from "./patrol.js";
 
 // --- Configuració del Joc ---
-const GAME_WIDTH = 720;
-const GAME_HEIGHT = 1280;
+// Fully responsive: fill viewport while keeping logical units consistent.
+// We use the actual viewport size to avoid letterbox and white bars.
+const GAME_WIDTH = typeof window !== "undefined" ? window.innerWidth : 720;
+const GAME_HEIGHT = typeof window !== "undefined" ? window.innerHeight : 1280;
 
 const k = kaplay({
   width: GAME_WIDTH,
   height: GAME_HEIGHT,
-  letterbox: true,
+  letterbox: false, // fill viewport
+  stretch: true, // scale to viewport
   scale: 1,
   crisp: false, // Disable crisp rendering for smoother sprites
   pixelDensity: 1.5, // Use device pixel ratio for sharper rendering
