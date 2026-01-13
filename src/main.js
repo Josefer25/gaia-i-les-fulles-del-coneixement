@@ -302,9 +302,16 @@ function getTileDefinitions() {
     "@": () => [
       k.sprite(currentGaiaSprite),
       k.scale(0.7),
-      k.area(),
+      // Custom hitbox - smaller than sprite to cut margins and better collision
+      k.area({
+        shape: new k.Rect(
+          k.vec2(0, 0), // Offset up so bottom of hitbox is at ground level
+          80, // Width - narrower than full sprite
+          258 // Height - shorter to cut bottom margin and fix floating
+        ),
+      }),
       k.body(),
-      k.anchor(k.vec2(0.5, 0.85)), // Anchor slightly higher to cut bottom margin
+      k.anchor("center"), // Use center anchor with custom hitbox
       k.z(2),
       "player",
     ],
@@ -708,6 +715,8 @@ function loadLevel(levelIndex) {
           const respawnPos = checkpointPos
             ? checkpointPos.clone()
             : startPos.clone();
+          // Adjust Y position up by 64 pixels to account for hitbox offset
+          respawnPos.y -= 64;
           player.pos = respawnPos;
           player.vel.x = 0;
           player.vel.y = 0;
@@ -1089,6 +1098,8 @@ k.onUpdate(() => {
   if (player.pos.y > failThreshold) {
     // Respawn at checkpoint if available, otherwise at start
     const respawnPos = checkpointPos ? checkpointPos.clone() : startPos.clone();
+    // Adjust Y position up by 64 pixels to account for hitbox offset
+    respawnPos.y -= 64;
     player.pos = respawnPos;
     player.vel.x = 0;
     player.vel.y = 0;
@@ -1578,4 +1589,4 @@ function setupTouchControls() {
 
 // --- Start Game ---
 setupTouchControls();
-loadLevel(2);
+loadLevel(0);

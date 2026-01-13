@@ -45,13 +45,13 @@ export const level1 = {
     r(
       "                                                                         $    $    $                ==           ==      $   "
     ),
-    // Row 13: Added the flag 'f' here, so it sits ON TOP of the bridge below
+    // Row 13: Player spawn row (one row higher)
     r(
-      "                                                      g               g             f      g      ==               ==        "
+      " @                                                 g               g             f      g      ==               ==        "
     ),
-    // Row 14: Removed the floating 'f' from the gap
+    // Row 14: Ground level with flags and enemies
     r(
-      " @    f      g     =  =     f      g    ==========  ======          ==========================  ==                   ==      "
+      "      f      g     =  =     f      g    ==========  ======          ==========================  ==                   ==      "
     ),
     r(
       "==================      ================                                                      ==                       ==   ^"
