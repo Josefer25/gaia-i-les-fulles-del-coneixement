@@ -12,19 +12,39 @@ const k = kaplay({
   height: GAME_HEIGHT,
   letterbox: true,
   scale: 1,
+  crisp: false, // Disable crisp rendering for smoother sprites
+  pixelDensity: window.devicePixelRatio || 2, // Use device pixel ratio for sharper rendering
 });
 
 // --- Càrrega de Sprites ---
-// Gaia per nivell
-k.loadSprite("gaia_l1_still", "/sprites/gaia/l1/still.png");
-k.loadSprite("gaia_l1_moving1", "/sprites/gaia/l1/moving1.png");
-k.loadSprite("gaia_l1_moving2", "/sprites/gaia/l1/moving2.png");
-k.loadSprite("gaia_l2_still", "/sprites/gaia/l2/still.png");
-k.loadSprite("gaia_l2_moving1", "/sprites/gaia/l2/moving1.png");
-k.loadSprite("gaia_l2_moving2", "/sprites/gaia/l2/moving2.png");
-k.loadSprite("gaia_l3_still", "/sprites/gaia/l3/still.png");
-k.loadSprite("gaia_l3_moving1", "/sprites/gaia/l3/moving1.png");
-k.loadSprite("gaia_l3_moving2", "/sprites/gaia/l3/moving2.png");
+// Gaia per nivell (sprite sheets with 36 frames in 6x6 grid)
+k.loadSprite("gaia_l1_sheet", "/sprites/gaia/l1/sprite.png", {
+  filter: "linear",
+  sliceX: 6,
+  sliceY: 6,
+  anims: {
+    idle: 0,
+    walk: { from: 0, to: 35, loop: true, speed: 30 },
+  },
+});
+k.loadSprite("gaia_l2_sheet", "/sprites/gaia/l2/sprite.png", {
+  filter: "linear",
+  sliceX: 6,
+  sliceY: 6,
+  anims: {
+    idle: 0,
+    walk: { from: 0, to: 35, loop: true, speed: 30 },
+  },
+});
+k.loadSprite("gaia_l3_sheet", "/sprites/gaia/l3/sprite.png", {
+  filter: "linear",
+  sliceX: 6,
+  sliceY: 6,
+  anims: {
+    idle: 0,
+    walk: { from: 0, to: 35, loop: true, speed: 45 },
+  },
+});
 k.loadSprite("steel", "/sprites/steel.png");
 k.loadSprite("grass", "/sprites/grass.png");
 k.loadSprite("coin", "/sprites/llibre.png");
@@ -79,31 +99,12 @@ let canDash = false; // Si el jugador pot fer dash
 let isDashing = false; // Si el jugador està fent dash
 let dashDirection = 0; // Direcció del dash (-1 esquerra, 1 dreta, 0 cap avall)
 let dashUpdateHandler = null; // Handler per cancel·lar l'actualització del dash
-let currentGaiaSprites = {
-  still: "gaia_l1_still",
-  moving1: "gaia_l1_moving1",
-  moving2: "gaia_l1_moving2",
-};
-const gaiaSpriteSets = [
-  {
-    still: "gaia_l1_still",
-    moving1: "gaia_l1_moving1",
-    moving2: "gaia_l1_moving2",
-  },
-  {
-    still: "gaia_l2_still",
-    moving1: "gaia_l2_moving1",
-    moving2: "gaia_l2_moving2",
-  },
-  {
-    still: "gaia_l3_still",
-    moving1: "gaia_l3_moving1",
-    moving2: "gaia_l3_moving2",
-  },
-];
+let currentGaiaSprite = "gaia_l1_sheet";
+const gaiaSprites = ["gaia_l1_sheet", "gaia_l2_sheet", "gaia_l3_sheet"];
+
 function setGaiaSpriteSet(levelIndex) {
-  const idx = Math.min(Math.max(levelIndex, 0), gaiaSpriteSets.length - 1);
-  currentGaiaSprites = gaiaSpriteSets[idx];
+  const idx = Math.min(Math.max(levelIndex, 0), gaiaSprites.length - 1);
+  currentGaiaSprite = gaiaSprites[idx];
 }
 
 const touchState = {
@@ -262,11 +263,11 @@ k.onAdd("portal_anim", (portal) => {
 function getTileDefinitions() {
   return {
     "@": () => [
-      k.sprite(currentGaiaSprites.still),
-      k.scale(0.25),
+      k.sprite(currentGaiaSprite),
+      k.scale(0.7),
       k.area(),
       k.body(),
-      k.anchor("bot"),
+      k.anchor(k.vec2(0.5, 0.85)), // Anchor slightly higher to cut bottom margin
       k.z(2),
       "player",
     ],
@@ -379,18 +380,13 @@ function loadLevel(levelIndex) {
   checkpointPos = null; // Reset checkpoint for new level
   activatedFlags.clear(); // Clear activated flags for new level
 
-  // Ensure player has correct scale (make it smaller)
-  if (!player.scale || player.scale.x !== 0.25) {
-    player.scale = k.vec2(0.25, 0.25);
+  // Ensure player has correct scale
+  if (!player.scale || Math.abs(player.scale.x) !== 0.7) {
+    player.scale = k.vec2(0.7, 0.7);
   }
 
-  // Initialize animation state
-  if (!player.animTime) {
-    player.animTime = 0;
-  }
-  if (!player.isMoving) {
-    player.isMoving = false;
-  }
+  // Initialize animation - start with idle
+  player.play("idle");
 
   // Reset dash ability when level loads
   canDash = false;
@@ -874,25 +870,15 @@ k.onUpdate(() => {
     }
 
     if (isMovingHorizontally && player.isGrounded()) {
-      // Animate between moving1 and moving2
-      player.animTime += k.dt();
-      const animSpeed = 0.15; // Time per frame
-      const frame = Math.floor(player.animTime / animSpeed) % 2;
-      const targetSprite =
-        frame === 0 ? currentGaiaSprites.moving1 : currentGaiaSprites.moving2;
-
-      // Check current sprite and switch if needed
-      const currentSprite = player.sprite;
-      if (!currentSprite || currentSprite.name !== targetSprite) {
-        player.use(k.sprite(targetSprite));
+      // Play walk animation
+      if (player.getCurAnim()?.name !== "walk") {
+        player.play("walk");
       }
     } else {
-      // Use still sprite
-      const currentSprite = player.sprite;
-      if (!currentSprite || currentSprite.name !== currentGaiaSprites.still) {
-        player.use(k.sprite(currentGaiaSprites.still));
+      // Play idle animation (stops on first frame)
+      if (player.getCurAnim()?.name !== "idle") {
+        player.play("idle");
       }
-      player.animTime = 0;
     }
   }
 
@@ -912,7 +898,7 @@ k.onUpdate(() => {
     if (player.scale) {
       const currentScaleX = player.scale.x;
       // Preserve horizontal flip direction
-      player.scale = k.vec2(currentScaleX < 0 ? -0.25 : 0.25, 0.25);
+      player.scale = k.vec2(currentScaleX < 0 ? -0.7 : 0.7, 0.7);
     }
     player.angle = 0;
     if (player.opacity !== undefined) {
@@ -1002,9 +988,7 @@ function attemptDash(directionOverride) {
       ? dashDirection
       : 1;
 
-  const originalScale = player.scale
-    ? player.scale.clone()
-    : k.vec2(0.25, 0.25);
+  const originalScale = player.scale ? player.scale.clone() : k.vec2(0.7, 0.7);
   const originalOpacity = player.opacity !== undefined ? player.opacity : 1;
   const baseScaleX = Math.abs(originalScale.x);
   const stretchX = dashDir > 0 ? baseScaleX * 2.0 : baseScaleX * 0.5; // More exaggerated stretch
@@ -1027,8 +1011,8 @@ function attemptDash(directionOverride) {
     dashUpdateHandler.cancel();
   }
 
-  // Force moving sprite for dash
-  player.use(k.sprite(currentGaiaSprites.moving2));
+  // Force walk animation for dash
+  player.play("walk");
 
   dashUpdateHandler = player.onUpdate(() => {
     if (!isDashing) {
@@ -1059,7 +1043,7 @@ function attemptDash(directionOverride) {
     if (dashTime % 0.05 < k.dt()) {
       // Spawn roughly every 0.05s
       const ghost = k.add([
-        k.sprite(currentGaiaSprites.moving2),
+        k.sprite(currentGaiaSprite),
         k.pos(player.pos),
         k.scale(player.scale),
         k.anchor("bot"),
@@ -1067,6 +1051,7 @@ function attemptDash(directionOverride) {
         k.z(1), // Behind player
         "ghost_trail",
       ]);
+      ghost.play("walk");
       // Flip ghost if player is flipped
       ghost.scale.x = player.scale.x;
 
