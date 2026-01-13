@@ -16,7 +16,7 @@ const k = kaplay({
   stretch: true, // scale to viewport
   scale: 1,
   crisp: false, // Disable crisp rendering for smoother sprites
-  pixelDensity: 1.5, // Use device pixel ratio for sharper rendering
+  pixelDensity: 1, // Use device pixel ratio for sharper rendering
 });
 
 // --- Càrrega de Sprites ---
