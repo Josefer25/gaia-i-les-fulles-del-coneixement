@@ -55,7 +55,7 @@ export const level3 = {
   ],
   welcomeMessage: {
     title: "El Buit Còsmic",
-    text: "La gravetat és traïdora aquí.\nFes servir el DASH amb un swipe horitzontal per arribar a les illes llunyanes!",
+    text: "La gravetat és traïdora ací.\nFes servir el DASH amb un swipe horitzontal per arribar a les illes llunyanes!",
   },
   sprites: [
     "gaia_still",

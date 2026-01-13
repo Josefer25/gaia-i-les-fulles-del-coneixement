@@ -957,7 +957,24 @@ function attemptDash(directionOverride) {
     }
 
     dashTime += k.dt();
-    player.vel.y += GRAVITY * k.dt();
+
+    // Fight gravity during dash, but only when falling (not when rising)
+    // If moving upward (vel.y < 0), let gravity work normally
+    // If falling (vel.y > 0), fight gravity to slow the fall
+    if (player.vel.y > 0) {
+      // Player is falling - fight gravity to slow the descent
+      const gravityFightForce = GRAVITY * 1.2; // 20% stronger than gravity
+      player.vel.y -= gravityFightForce * k.dt();
+
+      // Cap downward velocity to prevent too fast falling
+      if (player.vel.y > 200) {
+        player.vel.y = 200;
+      }
+    } else {
+      // Player is rising or at peak - apply normal gravity (don't fight it)
+      // This prevents propelling upward when dashing after a jump
+      player.vel.y += GRAVITY * k.dt();
+    }
 
     // Spawn trail ghosts
     if (dashTime % 0.05 < k.dt()) {
