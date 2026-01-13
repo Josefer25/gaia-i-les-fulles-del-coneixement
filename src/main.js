@@ -1011,8 +1011,10 @@ function attemptDash(directionOverride) {
     dashUpdateHandler.cancel();
   }
 
-  // Force walk animation for dash
+  // Force walk animation for dash at higher speed
   player.play("walk");
+
+  let lastGhostTime = 0;
 
   dashUpdateHandler = player.onUpdate(() => {
     if (!isDashing) {
@@ -1039,9 +1041,9 @@ function attemptDash(directionOverride) {
       player.vel.y += GRAVITY * k.dt();
     }
 
-    // Spawn trail ghosts
-    if (dashTime % 0.05 < k.dt()) {
-      // Spawn roughly every 0.05s
+    // Spawn trail ghosts - less frequently for better performance
+    if (dashTime - lastGhostTime > 0.08) {
+      lastGhostTime = dashTime;
       const ghost = k.add([
         k.sprite(currentGaiaSprite),
         k.pos(player.pos),
@@ -1055,21 +1057,21 @@ function attemptDash(directionOverride) {
       // Flip ghost if player is flipped
       ghost.scale.x = player.scale.x;
 
-      // Fade out ghost
+      // Fade out ghost - faster for better performance
       k.tween(
         0.5,
         0,
-        0.3,
+        0.2,
         (val) => (ghost.opacity = val),
-        k.easings.easeOutQuad
+        k.easings.linear
       ).onEnd(() => {
         ghost.destroy();
       });
     }
 
     const progress = dashTime / DASH_DURATION;
-    // Use a more dynamic ease for recovery
-    const easeOut = 1 - Math.pow(1 - progress, 5); // Quintic ease out for snappiness
+    // Simpler linear interpolation for better performance
+    const easeOut = progress;
 
     const currentScaleXAbs = k.lerp(
       Math.abs(finalStretchX),
