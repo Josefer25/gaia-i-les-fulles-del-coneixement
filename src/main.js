@@ -84,7 +84,44 @@ const GRAVITY = 2400;
 const TOUCH_MOVE_DELAY_MS = 50;
 const TOUCH_SWIPE_THRESHOLD = 90;
 const TOUCH_GESTURE_RESET_MS = 180;
+const COIN_MAGNET_RADIUS = 150; // Radius for coin magnetism
+const COIN_MAGNET_SPEED = 800;
 k.setGravity(GRAVITY);
+
+// --- Particle System ---
+function spawnParticles(pos, count, color, speed = 200, lifetime = 0.5) {
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const particleSpeed = speed * (0.5 + Math.random() * 0.5);
+    const particle = k.add([
+      k.circle(3 + Math.random() * 3),
+      k.pos(pos),
+      k.color(color),
+      k.opacity(1),
+      k.z(10),
+      k.anchor("center"),
+      "particle",
+    ]);
+
+    const velX = Math.cos(angle) * particleSpeed;
+    const velY = Math.sin(angle) * particleSpeed - 100; // Upward bias
+
+    particle.onUpdate(() => {
+      particle.pos.x += velX * k.dt();
+      particle.pos.y += velY * k.dt();
+    });
+
+    k.tween(1, 0, lifetime, (val) => (particle.opacity = val)).onEnd(() => {
+      particle.destroy();
+    });
+  }
+}
+
+// --- Screen Shake ---
+let shakeAmount = 0;
+function screenShake(intensity) {
+  shakeAmount = intensity;
+}
 
 // --- Sistema de Nivells ---
 let currentLevelIndex = 0;
@@ -401,6 +438,49 @@ function loadLevel(levelIndex) {
   currentCamPos = player.worldPos();
   k.camPos(currentCamPos);
 
+  // Add ambient particles (butterflies/leaves) for each level
+  const ambientColors = [
+    k.rgb(100, 200, 100), // Level 1: Green leaves
+    k.rgb(150, 150, 200), // Level 2: Purple/blue
+    k.rgb(200, 200, 255), // Level 3: White/cosmic
+  ];
+  const ambientColor = ambientColors[levelIndex] || ambientColors[0];
+
+  // Spawn ambient particles periodically
+  k.loop(2, () => {
+    if (!player) return;
+    const spawnX = player.pos.x + (Math.random() - 0.5) * GAME_WIDTH;
+    const spawnY = player.pos.y - GAME_HEIGHT / 2 + Math.random() * GAME_HEIGHT;
+
+    const ambient = k.add([
+      k.circle(2 + Math.random() * 3),
+      k.pos(spawnX, spawnY),
+      k.color(ambientColor),
+      k.opacity(0.3 + Math.random() * 0.4),
+      k.z(-5),
+      k.anchor("center"),
+      "ambient",
+    ]);
+
+    const driftX = (Math.random() - 0.5) * 50;
+    const driftY = (Math.random() - 0.5) * 30;
+    const lifetime = 3 + Math.random() * 2;
+
+    ambient.onUpdate(() => {
+      ambient.pos.x += driftX * k.dt();
+      ambient.pos.y += driftY * k.dt();
+    });
+
+    k.tween(
+      ambient.opacity,
+      0,
+      lifetime,
+      (val) => (ambient.opacity = val)
+    ).onEnd(() => {
+      ambient.destroy();
+    });
+  });
+
   // Setup enemy patrol
   k.wait(0, () => {
     const enemies = level.get("enemy");
@@ -516,11 +596,25 @@ function loadLevel(levelIndex) {
       });
     });
 
-    // Coin collection
+    // Coin collection with particles
     player.onCollide("coin", (coin) => {
       coinCount++;
       coinText.text = `Fulls: ${coinCount}`;
-      coin.destroy();
+
+      // Spawn gold particles
+      spawnParticles(coin.pos, 12, k.rgb(255, 215, 0), 250, 0.6);
+
+      // Scale up and fade animation
+      k.tween(
+        coin.scale,
+        k.vec2(0.4, 0.4),
+        0.15,
+        (s) => (coin.scale = s),
+        k.easings.easeOutQuad
+      );
+      k.tween(1, 0, 0.15, (val) => (coin.opacity = val)).onEnd(() =>
+        coin.destroy()
+      );
     });
 
     // Flag checkpoint system
@@ -592,15 +686,38 @@ function loadLevel(levelIndex) {
       }
     });
 
-    // Enemy collision - death
+    // Enemy collision - death with animation
     player.onCollide("enemy", () => {
-      // Respawn at checkpoint if available, otherwise at start
-      const respawnPos = checkpointPos
-        ? checkpointPos.clone()
-        : startPos.clone();
-      player.pos = respawnPos;
-      player.vel.x = 0;
-      player.vel.y = 0;
+      if (player.isDying) return;
+      player.isDying = true;
+
+      // Death particles
+      spawnParticles(player.pos, 20, k.rgb(255, 80, 80), 300, 0.8);
+
+      // Death animation
+      const deathDuration = 0.4;
+      k.tween(0, 720, deathDuration, (val) => (player.angle = val));
+      k.tween(
+        player.scale,
+        k.vec2(0.1, 0.1),
+        deathDuration,
+        (s) => (player.scale = s)
+      );
+      k.tween(1, 0, deathDuration, (val) => (player.opacity = val)).onEnd(
+        () => {
+          const respawnPos = checkpointPos
+            ? checkpointPos.clone()
+            : startPos.clone();
+          player.pos = respawnPos;
+          player.vel.x = 0;
+          player.vel.y = 0;
+          player.angle = 0;
+          player.scale = k.vec2(0.7, 0.7);
+          player.opacity = 1;
+          player.isDying = false;
+          spawnParticles(player.pos, 15, k.rgb(150, 220, 255), 250, 0.6);
+        }
+      );
     });
   });
 
@@ -834,7 +951,32 @@ k.onUpdate(() => {
     }
   }
 
+  // Screen shake effect
+  if (shakeAmount > 0) {
+    const shakeX = (Math.random() - 0.5) * shakeAmount;
+    const shakeY = (Math.random() - 0.5) * shakeAmount;
+    k.camPos(currentCamPos.x + shakeX, currentCamPos.y + shakeY);
+    shakeAmount *= 0.9; // Decay
+  }
+
   if (!player) return;
+
+  // Coin magnetism
+  const coins = k.get("coin");
+  coins.forEach((coin) => {
+    const dist = player.pos.dist(coin.pos);
+    if (dist < COIN_MAGNET_RADIUS) {
+      const dir = player.pos.sub(coin.pos).unit();
+      coin.pos = coin.pos.add(dir.scale(COIN_MAGNET_SPEED * k.dt()));
+    }
+    // Floating animation
+    if (coin.floatTime !== undefined) {
+      coin.floatTime += k.dt();
+      const originalY = coin.pos.y;
+      coin.pos.y += Math.sin(coin.floatTime * 3) * 0.3;
+      coin.angle += k.dt() * 100; // Slow rotation
+    }
+  });
 
   // Update animation state
   const isMovingHorizontally =
@@ -904,6 +1046,10 @@ k.onUpdate(() => {
     if (player.opacity !== undefined) {
       player.opacity = 1;
     }
+
+    // Landing particles and screen shake
+    spawnParticles(player.pos, 8, k.rgb(180, 180, 180), 150, 0.4);
+    screenShake(5);
   }
   wasGrounded = player.isGrounded();
 
@@ -963,6 +1109,10 @@ function attemptJump() {
   if (player && player.isGrounded()) {
     player.jump(1500);
     canDash = true;
+
+    // Jump particles
+    spawnParticles(player.pos, 10, k.rgb(200, 200, 200), 180, 0.4);
+
     return true;
   }
   return false;
@@ -1004,6 +1154,10 @@ function attemptDash(directionOverride) {
   player.scale = k.vec2(finalStretchX, stretchY);
   player.angle = rotationAmount;
   player.opacity = 0.9;
+
+  // Dash particles and screen shake
+  spawnParticles(player.pos, 15, k.rgb(100, 200, 255), 300, 0.5);
+  screenShake(8);
 
   let dashTime = 0;
 
@@ -1424,4 +1578,4 @@ function setupTouchControls() {
 
 // --- Start Game ---
 setupTouchControls();
-loadLevel(0);
+loadLevel(2);
