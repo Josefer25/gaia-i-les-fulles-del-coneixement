@@ -13,7 +13,7 @@ const k = kaplay({
   letterbox: true,
   scale: 1,
   crisp: false, // Disable crisp rendering for smoother sprites
-  pixelDensity: window.devicePixelRatio || 2, // Use device pixel ratio for sharper rendering
+  pixelDensity: 1.5, // Use device pixel ratio for sharper rendering
 });
 
 // --- Càrrega de Sprites ---
