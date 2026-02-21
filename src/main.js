@@ -241,7 +241,7 @@ function createParallaxLayers(layers) {
     const sprite = k.getSprite(layerDef.sprite);
     if (!sprite || !sprite.data) {
       k.debug.log(
-        `Warning: Sprite ${layerDef.sprite} not found or not loaded!`
+        `Warning: Sprite ${layerDef.sprite} not found or not loaded!`,
       );
       return;
     }
@@ -271,7 +271,7 @@ function createParallaxLayers(layers) {
     } catch (error) {
       k.debug.log(
         `Error creating parallax layer for ${layerDef.sprite}:`,
-        error
+        error,
       );
     }
   });
@@ -310,7 +310,7 @@ function getTileDefinitions() {
         shape: new k.Rect(
           k.vec2(0, 0), // Offset up so bottom of hitbox is at ground level
           80, // Width - narrower than full sprite
-          258 // Height - shorter to cut bottom margin and fix floating
+          258, // Height - shorter to cut bottom margin and fix floating
         ),
       }),
       k.body(),
@@ -485,7 +485,7 @@ function loadLevel(levelIndex) {
       ambient.opacity,
       0,
       lifetime,
-      (val) => (ambient.opacity = val)
+      (val) => (ambient.opacity = val),
     ).onEnd(() => {
       ambient.destroy();
     });
@@ -523,7 +523,7 @@ function loadLevel(levelIndex) {
       // Calculem el centre del portal
       const portalCenter = k.vec2(
         portal.pos.x,
-        portal.pos.y - (portal.sprite?.height || 32) / 2
+        portal.pos.y - (portal.sprite?.height || 32) / 2,
       );
 
       // Anima la posició del jugador cap al centre del portal
@@ -532,7 +532,7 @@ function loadLevel(levelIndex) {
         portalCenter, // Destí (centre del portal)
         animTime, // Durada
         (p) => (player.pos = p), // Funció que actualitza la posició
-        k.easings.easeInOutSine // Una animació suau
+        k.easings.easeInOutSine, // Una animació suau
       );
 
       // Anima l'escala del jugador a 0 (desapareix)
@@ -544,7 +544,7 @@ function loadLevel(levelIndex) {
         k.vec2(0.1, 0.1), // El fem molt petit
         animTime,
         (s) => (player.scale = s),
-        k.easings.easeInSine
+        k.easings.easeInSine,
       );
 
       // 3. FEM EL FOS A NEGRE (Fade to Black)
@@ -561,7 +561,7 @@ function loadLevel(levelIndex) {
         0,
         1,
         animTime, // A la mateixa velocitat
-        (o) => (fadeBox.opacity = o)
+        (o) => (fadeBox.opacity = o),
       );
 
       // 4. CANVIEM DE NIVELL
@@ -570,7 +570,8 @@ function loadLevel(levelIndex) {
         // Restaurem la gravetat per al proper nivell
         k.setGravity(2400);
 
-        isTransitioning = false; // Reseteja el pany
+        // No resetegem `isTransitioning` perquè si no hi ha més nivells,
+        // no volem que es torni a disparar l'esdeveniment contínuament.
 
         // Canviem de nivell
         nextLevel();
@@ -583,7 +584,7 @@ function loadLevel(levelIndex) {
             0,
             0.5,
             (o) => (fadeBox.opacity = o),
-            k.easings.easeOutSine
+            k.easings.easeOutSine,
           ).onEnd(() => {
             fadeBox.destroy();
           });
@@ -598,7 +599,7 @@ function loadLevel(levelIndex) {
                 () => {
                   // Continuar temporitzador quan es tanca la pantalla
                   isTimerRunning = true;
-                }
+                },
               );
             }
           });
@@ -620,10 +621,10 @@ function loadLevel(levelIndex) {
         k.vec2(0.4, 0.4),
         0.15,
         (s) => (coin.scale = s),
-        k.easings.easeOutQuad
+        k.easings.easeOutQuad,
       );
       k.tween(1, 0, 0.15, (val) => (coin.opacity = val)).onEnd(() =>
-        coin.destroy()
+        coin.destroy(),
       );
     });
 
@@ -649,7 +650,7 @@ function loadLevel(levelIndex) {
         originalY - 30,
         0.2,
         (y) => (flag.pos.y = y),
-        k.easings.easeOutQuad
+        k.easings.easeOutQuad,
       ).onEnd(() => {
         // Bounce back down
         k.tween(
@@ -657,7 +658,7 @@ function loadLevel(levelIndex) {
           originalY,
           0.3,
           (y) => (flag.pos.y = y),
-          k.easings.easeOutBounce
+          k.easings.easeOutBounce,
         );
       });
 
@@ -668,14 +669,14 @@ function loadLevel(levelIndex) {
         k.vec2(originalScale.x * 1.3, originalScale.y * 1.3),
         0.15,
         (s) => (flag.scale = s),
-        k.easings.easeOutQuad
+        k.easings.easeOutQuad,
       ).onEnd(() => {
         k.tween(
           flag.scale,
           originalScale,
           0.15,
           (s) => (flag.scale = s),
-          k.easings.easeInQuad
+          k.easings.easeInQuad,
         );
       });
 
@@ -711,7 +712,7 @@ function loadLevel(levelIndex) {
         player.scale,
         k.vec2(0.1, 0.1),
         deathDuration,
-        (s) => (player.scale = s)
+        (s) => (player.scale = s),
       );
       k.tween(1, 0, deathDuration, (val) => (player.opacity = val)).onEnd(
         () => {
@@ -728,7 +729,7 @@ function loadLevel(levelIndex) {
           player.opacity = 1;
           player.isDying = false;
           spawnParticles(player.pos, 15, k.rgb(150, 220, 255), 250, 0.6);
-        }
+        },
       );
     });
   });
@@ -744,7 +745,7 @@ function loadLevel(levelIndex) {
         () => {
           // Continuar temporitzador quan es tanca
           isTimerRunning = true;
-        }
+        },
       );
     });
   }
@@ -828,7 +829,7 @@ function showVictoryScreen() {
   const shareData = {
     title: "Gaia i els Fulls del Coneixement",
     text: `He completat Gaia i els Fulls del Coneixement en ${formatTime(
-      gameTime
+      gameTime,
     )} amb ${coinCount} fulls! 🍃✨`,
     url: window.location.href, // Comparteix la URL del joc
   };
@@ -1011,10 +1012,10 @@ k.onUpdate(() => {
           ? 1
           : -1
         : k.isKeyDown("right") || (isTouchMoving && touchMoveDirection > 0)
-        ? 1
-        : k.isKeyDown("left") || (isTouchMoving && touchMoveDirection < 0)
-        ? -1
-        : 0;
+          ? 1
+          : k.isKeyDown("left") || (isTouchMoving && touchMoveDirection < 0)
+            ? -1
+            : 0;
 
     // Flip sprite horizontally when moving left
     if (moveDir < 0) {
@@ -1149,8 +1150,8 @@ function attemptDash(directionOverride) {
     typeof directionOverride === "number" && directionOverride !== 0
       ? directionOverride
       : dashDirection !== 0
-      ? dashDirection
-      : 1;
+        ? dashDirection
+        : 1;
 
   const originalScale = player.scale ? player.scale.clone() : k.vec2(0.7, 0.7);
   const originalOpacity = player.opacity !== undefined ? player.opacity : 1;
@@ -1231,7 +1232,7 @@ function attemptDash(directionOverride) {
         0,
         0.2,
         (val) => (ghost.opacity = val),
-        k.easings.linear
+        k.easings.linear,
       ).onEnd(() => {
         ghost.destroy();
       });
@@ -1244,7 +1245,7 @@ function attemptDash(directionOverride) {
     const currentScaleXAbs = k.lerp(
       Math.abs(finalStretchX),
       Math.abs(originalScale.x),
-      easeOut
+      easeOut,
     );
     const currentScaleY = k.lerp(stretchY, originalScale.y, easeOut);
     // Preserve horizontal flip direction
@@ -1405,7 +1406,7 @@ function setupTouchControls() {
   const handleSwipe = (
     deltaX,
     deltaY,
-    { preserveMovement = false, allowVerticalPriority = false } = {}
+    { preserveMovement = false, allowVerticalPriority = false } = {},
   ) => {
     if (touchState.gestureUsed) {
       return false;
@@ -1501,7 +1502,7 @@ function setupTouchControls() {
         }
       }
     },
-    false
+    false,
   );
 
   const handleExtraSwipeMove = (touch) => {
@@ -1564,13 +1565,13 @@ function setupTouchControls() {
 
       const extraTouch = findTouchById(
         event.changedTouches,
-        extraSwipeState.id
+        extraSwipeState.id,
       );
       if (extraTouch) {
         handleExtraSwipeMove(extraTouch);
       }
     },
-    false
+    false,
   );
 
   const handleTouchEnd = (event) => {
